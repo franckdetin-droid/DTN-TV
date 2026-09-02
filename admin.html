@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Régie & Administration TV — VISION+ 24/7</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .tab-btn.active {
+      background-color: #dc2626;
+      color: #ffffff;
+      box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+    }
+    .tab-btn {
+      color: #475569;
+      background-color: transparent;
+    }
+    .tab-btn:hover:not(.active) {
+      background-color: #f1f5f9;
+      color: #0f172a;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col font-sans antialiased">
+  
+  <!-- MODAL DE VERROUILLAGE PIN 3004 -->
+  <div id="pin-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6 text-center">
+      <div class="w-16 h-16 rounded-2xl bg-red-50 border border-red-200 text-red-600 flex items-center justify-center mx-auto text-2xl shadow-inner">
+        🔒
+      </div>
+      
+      <div class="space-y-1.5">
+        <h2 class="text-xl font-black text-slate-900">Régie Sécurisée</h2>
+        <p class="text-xs text-slate-500 font-medium">
+          Saisissez le code PIN administrateur pour gérer les chaînes, diffuser des flux et configurer la grille.
+        </p>
+      </div>
+
+      <form id="pin-form" onsubmit="handlePinSubmit(event)" class="space-y-4">
+        <div class="relative">
+          <input 
+            type="password" 
+            id="pin-input" 
+            placeholder="Code PIN (ex: 3004)"
+            class="w-full bg-slate-50 border border-slate-300 focus:border-red-600 focus:ring-2 focus:ring-red-600/20 rounded-2xl px-4 py-3.5 text-center text-lg font-black tracking-widest text-slate-900 outline-none transition"
+            required 
+            autocomplete="current-password"
+          />
+          <button 
+            type="button" 
+            onclick="togglePinVisibility()" 
+            class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-sm font-bold p-1 cursor-pointer"
+          >
+            👁️
+          </button>
+        </div>
+
+        <p id="pin-error" class="text-xs font-bold text-red-600 hidden">
+          ⚠️ Code PIN incorrect. Le code par défaut est 3004.
+        </p>
+
+        <div class="flex items-center gap-2 pt-2">
+          <a href="/" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-3.5 rounded-xl transition text-center">
+            ← Annuler
+          </a>
+          <button type="submit" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-black text-xs py-3.5 rounded-xl transition shadow-md cursor-pointer">
+            Déverrouiller
+          </button>
+        </div>
+      </form>
+      
+      <div class="pt-2 border-t border-slate-100">
+        <span class="text-[11px] font-mono text-slate-400">PIN d'accès d'usine : <strong class="text-slate-600">3004</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- EN-TÊTE RÉGIE ADMIN -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 px-4 sm:px-6 py-3 shadow-xs">
+    <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <a href="/" class="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold px-3 py-2 rounded-xl border border-slate-300 transition flex items-center gap-1.5">
+          <span>←</span> <span class="hidden sm:inline">Retour Direct TV</span>
+        </a>
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-slate-900 text-white font-black flex items-center justify-center text-xs shadow-xs">
+            RÉGIE
+          </div>
+          <div>
+            <h1 class="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+              Console d'Administration & Diffusion
+              <span class="bg-red-50 text-red-600 border border-red-200 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full">24/7 PRO</span>
+            </h1>
+            <p class="text-[11px] text-slate-500 font-medium">Stockage 2 To & Gestion Multi-Canaux</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span class="hidden md:flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-3 py-1.5 rounded-xl">
+          <span class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+          Serveur 2 To En Ligne
+        </span>
+        <button onclick="lockAdmin()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-xl border border-slate-200 transition cursor-pointer">
+          🔒 Verrouiller
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- BARRE DE NAVIGATION DES ONGLETS -->
+  <div class="bg-white border-b border-slate-200 px-4 sm:px-6 py-2 shadow-2xs">
+    <div class="max-w-7xl mx-auto flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+      <button onclick="switchTab('channels')" id="tab-btn-channels" class="tab-btn active px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0 transition cursor-pointer">
+        <span>📺</span> <span>Chaînes TV</span>
+      </button>
+      <button onclick="switchTab('upload')" id="tab-btn-upload" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0 transition cursor-pointer">
+        <span>🎬</span> <span>Programmer une Vidéo / Lien</span>
+      </button>
+      <button onclick="switchTab('schedule')" id="tab-btn-schedule" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0 transition cursor-pointer">
+        <span>📋</span> <span>Grille des Programmes</span>
+      </button>
+      <button onclick="switchTab('flux')" id="tab-btn-flux" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0 transition cursor-pointer">
+        <span>📡</span> <span>Générateur de Flux</span>
+      </button>
+      <button onclick="switchTab('camera')" id="tab-btn-camera" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0 transition cursor-pointer">
+        <span>🎥</span> <span>Studio Caméra Direct</span>
+      </button>
+      <button onclick="switchTab('storage')" id="tab-btn-storage" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0 transition cursor-pointer">
+        <span>💾</span> <span>Stockage 2 To</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- CONTENU PRINCIPAL DE LA RÉGIE -->
+  <main class="max-w-7xl mx-auto p-4 sm:p-6 w-full space-y-6 flex-1">
+    
+    <!-- NOTIFICATION FLOTTANTE -->
+    <div id="toast-msg" class="hidden fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 border border-slate-700 text-xs font-bold animate-bounce">
+      <span id="toast-text">Action effectuée</span>
+    </div>
+
+    <!-- ONGLET 1 : GESTION & CRÉATION DE CHAÎNES TV -->
+    <section id="tab-content-channels" class="space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Formulaire de Création de Chaîne -->
+        <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-4 lg:col-span-1">
+          <div class="border-b border-slate-100 pb-3 flex items-center justify-between">
+            <h2 class="text-sm font-black text-slate-900 uppercase tracking-wide flex items-center gap-2">
+              <span>✨</span> Créer une Chaîne TV
+            </h2>
+            <span class="text-[10px] font-mono font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md">NOUVEAU</span>
+          </div>
+
+          <form onsubmit="handleCreateChannel(event)" class="space-y-3">
+            <div>
+              <label class="text-xs font-bold text-slate-700 block mb-1">Nom de la Chaîne</label>
+              <input type="text" id="new-ch-name" required placeholder="Ex: VISION+ SPORT" class="w-full bg-slate-50 border border-slate-300 focus:border-red-600 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 outline-none" />
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="text-xs font-bold text-slate-700 block mb-1">Numéro Canal</label>
+                <input type="text" id="new-ch-number" placeholder="Ex: CH 04" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 outline-none" />
+              </div>
+              <div>
+                <label class="text-xs font-bold text-slate-700 block mb-1">Logo Texte</label>
+                <input type="text" id="new-ch-logo" placeholder="Ex: SP+" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 outline-none" />
+              </div>
+            </div>
+
+            <div>
+              <label class="text-xs font-bold text-slate-700 block mb-1">Slogan / Sous-titre</label>
+              <input type="text" id="new-ch-slogan" placeholder="Ex: Le sport en direct 24/7" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 outline-none" />
+            </div>
+
+            <div>
+              <label class="text-xs font-bold text-slate-700 block mb-1">Genre / Catégorie</label>
+              <select id="new-ch-genre" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none">
+                <option value="Généraliste">Généraliste</option>
+                <option value="Information">Information & Débats</option>
+                <option value="Sport">Sport & Direct</option>
+                <option value="Cinéma">Cinéma & Séries</option>
+                <option value="Musique">Musique & Divertissement</option>
+                <option value="Documentaire">Découverte & Documentaire</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="text-xs font-bold text-slate-700 block mb-1">Bandeau Défilant (Ticker)</label>
+              <input type="text" id="new-ch-ticker" placeholder="Ex: BIENVENUE SUR LA NOUVELLE CHAÎNE DU BOUQUET" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 outline-none" />
+            </div>
+
+            <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white font-black text-xs py-3 rounded-xl transition shadow-xs cursor-pointer">
+              + Ajouter la Chaîne au Bouquet
+            </button>
+          </form>
+        </div>
+
+        <!-- Liste des Chaînes Existantes -->
+        <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-4 lg:col-span-2">
+          <div class="border-b border-slate-100 pb-3 flex items-center justify-between">
+            <h2 class="text-sm font-black text-slate-900 uppercase tracking-wide flex items-center gap-2">
+              <span>📺</span> Bouquet des Chaînes Actives (<span id="channels-count">0</span>)
+            </h2>
+            <span class="text-xs font-bold text-slate-500">Diffusion Synchrone 24/7</span>
+          </div>
+
+          <div id="channels-list" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <!-- Liste injectée dynamiquement en JS -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ONGLET 2 : PROGRAMMER UNE VIDÉO OU UN LIEN -->
+    <section id="tab-content-upload" class="space-y-6 hidden">
+      <div class="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs max-w-3xl mx-auto space-y-6">
+        <div class="border-b border-slate-100 pb-4 flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-black text-slate-900 flex items-center gap-2">
+              <span>🎬</span> Programmer une Émission ou Diffuser un Flux
+            </h2>
+            <p class="text-xs text-slate-500">Ajout immédiat à l'antenne ou programmation dans la grille 24/7</p>
+          </div>
+          <span class="bg-red-50 text-red-600 border border-red-200 text-xs font-bold px-3 py-1 rounded-xl">24/7 DIRECT</span>
+        </div>
+
+        <form id="upload-prog-form" onsubmit="handleProgramSubmit(event)" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="text-xs font-bold text-slate-700 block mb-1">Chaîne Cible</label>
+              <select id="prog-channel-select" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none">
+                <!-- Rempli en JS -->
+              </select>
+            </div>
+
+            <div>
+              <label class="text-xs font-bold text-slate-700 block mb-1">Titre de l'Émission</label>
+              <input type="text" id="prog-title" required placeholder="Ex: Le Grand Journal de 20H" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 outline-none" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="text-xs font-bold text-slate-700 block mb-1">Catégorie</label>
+              <select id="prog-category" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none">
+                <option value="Direct">Direct & Breaking News</option>
+                <option value="Journal">Journal Télévisé</option>
+                <option value="Film">Film & Fiction</option>
+                <option value="Sport">Sport & Match</option>
+                <option value="Musique">Concert & Musique</option>
+                <option value="Documentaire">Documentaire</option>
+                <option value="Divertissement">Divertissement & Talk Show</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="text-xs font-bold text-slate-700 block mb-1">Horaires (Début - Fin)</label>
+              <div class="flex items-center gap-2">
+                <input type="time" id="prog-start-time" value="20:00" class="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 outline-none" />
+                <span class="text-xs text-slate-400 font-bold">à</span>
+                <input type="time" id="prog-end-time" value="21:30" class="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 outline-none" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Choix Source Vidéo (Fichier Local vs Lien Externe) -->
+          <div class="border border-slate-200 rounded-2xl p-4 bg-slate-50 space-y-3">
+            <label class="text-xs font-black text-slate-900 block uppercase tracking-wider">
+              Source Vidéo ou Flux :
+            </label>
+
+            <div>
+              <label class="text-xs font-bold text-slate-700 block mb-1">Option A : Fichier Vidéo Local (Stockage 2 To)</label>
+              <input type="file" id="prog-file-input" accept="video/*" class="w-full text-xs text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-red-600 file:text-white hover:file:bg-red-700 cursor-pointer" />
+            </div>
+
+            <div class="relative flex py-1 items-center">
+              <div class="flex-grow border-t border-slate-300"></div>
+              <span class="flex-shrink mx-3 text-[11px] font-bold text-slate-400 uppercase">OU</span>
+              <div class="flex-grow border-t border-slate-300"></div>
+            </div>
+
+            <div>
+              <label class="text-xs font-bold text-slate-700 block mb-1">Option B : Lien Web Direct / Flux (MP4, HLS .m3u8, YouTube, Facebook)</label>
+              <input type="url" id="prog-url-input" placeholder="https://exemple.com/video.mp4 ou lien HLS / YouTube" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 outline-none" />
+            </div>
+          </div>
+
+          <!-- Boutons de Diffusion -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            <button type="button" onclick="submitProgram(true)" class="bg-red-600 hover:bg-red-700 text-white font-black text-xs py-3.5 rounded-xl transition shadow-sm flex items-center justify-center gap-2 cursor-pointer">
+              <span>🔴</span> <span>Diffuser Immédiatement (On Air)</span>
+            </button>
+            <button type="button" onclick="submitProgram(false)" class="bg-slate-900 hover:bg-black text-white font-black text-xs py-3.5 rounded-xl transition shadow-sm flex items-center justify-center gap-2 cursor-pointer">
+              <span>📅</span> <span>Ajouter à la Grille 24/7</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ONGLET 3 : GRILLE DES PROGRAMMES & CONDUCTEUR 24/7 -->
+    <section id="tab-content-schedule" class="space-y-6 hidden">
+      <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div>
+            <h2 class="text-base font-black text-slate-900 flex items-center gap-2">
+              <span>📋</span> Conducteur & Grille des Programmes
+            </h2>
+            <p class="text-xs text-slate-500">Consultez, réorganisez et lancez les émissions en un clic</p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <label class="text-xs font-bold text-slate-600">Chaîne :</label>
+            <select id="schedule-channel-filter" onchange="renderScheduleList()" class="bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 outline-none">
+              <!-- Rempli en JS -->
+            </select>
+          </div>
+        </div>
+
+        <div id="schedule-programs-container" class="space-y-2">
+          <!-- Injecté en JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ONGLET 4 : GÉNÉRATEUR DE FLUX & IPTV -->
+    <section id="tab-content-flux" class="space-y-6 hidden">
+      <div class="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs max-w-3xl mx-auto space-y-6">
+        <div class="border-b border-slate-100 pb-4">
+          <h2 class="text-base font-black text-slate-900 flex items-center gap-2">
+            <span>📡</span> Générateur de Liens & Flux de Diffusion
+          </h2>
+          <p class="text-xs text-slate-500">Exportez vos flux pour Smart TV, VLC, OBS Studio ou intégration Web</p>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="text-xs font-bold text-slate-700 block mb-1">Sélectionner la Chaîne TV</label>
+            <select id="flux-channel-select" onchange="generateFluxUrl()" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none">
+              <!-- Rempli en JS -->
+            </select>
+          </div>
+
+          <div>
+            <label class="text-xs font-bold text-slate-700 block mb-1">Protocole / Format de Diffusion</label>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <button type="button" onclick="setFluxFormat('m3u8')" class="flux-fmt-btn active p-2 rounded-xl text-xs font-bold border border-red-600 bg-red-50 text-red-600 transition">
+                HLS (.m3u8)
+              </button>
+              <button type="button" onclick="setFluxFormat('mp4')" class="flux-fmt-btn p-2 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-700 transition">
+                MP4 Direct 4K
+              </button>
+              <button type="button" onclick="setFluxFormat('m3u')" class="flux-fmt-btn p-2 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-700 transition">
+                Playlist M3U
+              </button>
+              <button type="button" onclick="setFluxFormat('rtmp')" class="flux-fmt-btn p-2 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-700 transition">
+                RTMP Studio
+              </button>
+            </div>
+          </div>
+
+          <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+            <label class="text-xs font-bold text-slate-700 block">URL du Flux Généré :</label>
+            <div class="flex items-center gap-2">
+              <input type="text" id="flux-output-url" readonly class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800 outline-none select-all" />
+              <button onclick="copyFluxUrl()" class="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shrink-0 cursor-pointer">
+                Copier
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ONGLET 5 : STUDIO CAMÉRA EN DIRECT -->
+    <section id="tab-content-camera" class="space-y-6 hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Écran Retour Caméra -->
+        <div class="lg:col-span-2 bg-black rounded-3xl overflow-hidden border border-slate-300 shadow-2xl relative aspect-video flex items-center justify-center">
+          <video id="studio-camera-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
+          
+          <div id="camera-off-overlay" class="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-6 text-center space-y-3">
+            <div class="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center text-3xl">
+              🎥
+            </div>
+            <h3 class="font-extrabold text-white text-sm">Studio Caméra en Attente</h3>
+            <p class="text-xs text-slate-400 max-w-sm">Allumez votre webcam ou caméra externe pour diffuser en direct avec vos filtres studio.</p>
+            <button onclick="startStudioCamera()" class="bg-red-600 hover:bg-red-700 text-white font-black text-xs px-5 py-2.5 rounded-xl shadow-lg transition cursor-pointer">
+              Allumer la Caméra Studio
+            </button>
+          </div>
+
+          <!-- Filigrane ON AIR Studio -->
+          <div id="camera-onair-badge" class="hidden absolute top-4 left-4 bg-red-600 text-white px-3 py-1 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md">
+            <span class="w-2 h-2 rounded-full bg-white animate-ping"></span>
+            ON AIR DIRECT
+          </div>
+        </div>
+
+        <!-- Commandes Caméra & Filtres -->
+        <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-4">
+          <h3 class="text-sm font-black text-slate-900 border-b border-slate-100 pb-3">
+            Contrôles du Direct Caméra
+          </h3>
+
+          <div class="space-y-2">
+            <button id="btn-toggle-cam" onclick="toggleStudioCamera()" class="w-full bg-red-600 hover:bg-red-700 text-white font-black text-xs py-3 rounded-xl transition cursor-pointer">
+              Allumer Caméra
+            </button>
+            <button id="btn-toggle-onair" onclick="toggleCameraOnAir()" class="w-full bg-slate-900 hover:bg-black text-white font-black text-xs py-3 rounded-xl transition cursor-pointer">
+              🔴 Passer la Caméra à l'Antenne
+            </button>
+          </div>
+
+          <div class="border-t border-slate-100 pt-3">
+            <label class="text-xs font-bold text-slate-700 block mb-2">Filtres Vidéo Studio :</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="applyCameraFilter('none')" class="cam-filter-btn active p-2 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 text-slate-800">
+                ✨ Naturel
+              </button>
+              <button onclick="applyCameraFilter('beauty')" class="cam-filter-btn p-2 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 text-slate-800">
+                🌸 Beauté & Éclat
+              </button>
+              <button onclick="applyCameraFilter('golden')" class="cam-filter-btn p-2 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 text-slate-800">
+                🌅 Golden Hour
+              </button>
+              <button onclick="applyCameraFilter('bw')" class="cam-filter-btn p-2 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 text-slate-800">
+                🎬 Noir & Blanc
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ONGLET 6 : STOCKAGE 2 TO & SERVEUR -->
+    <section id="tab-content-storage" class="space-y-6 hidden">
+      <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-6">
+        <div class="border-b border-slate-100 pb-4 flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-black text-slate-900 flex items-center gap-2">
+              <span>💾</span> Espace de Stockage Dédié 2 To
+            </h2>
+            <p class="text-xs text-slate-500">Diffusion haute performance avec streaming HTTP 206 Partial Content</p>
+          </div>
+          <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-3 py-1 rounded-xl">
+            2048 Go Total
+          </span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center">
+            <span class="text-xs text-slate-500 font-bold block mb-1">Capacité Maximale</span>
+            <span class="text-2xl font-black text-slate-900">2048 Go</span>
+          </div>
+          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center">
+            <span class="text-xs text-slate-500 font-bold block mb-1">Espace Utilisé</span>
+            <span id="storage-used-txt" class="text-2xl font-black text-red-600">0.00 Go</span>
+          </div>
+          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center">
+            <span class="text-xs text-slate-500 font-bold block mb-1">Espace Libre</span>
+            <span id="storage-free-txt" class="text-2xl font-black text-emerald-600">2048 Go</span>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider mb-3">Fichiers Vidéos dans le Stockage :</h3>
+          <div id="storage-files-list" class="space-y-2">
+            <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-center text-xs text-slate-500">
+              Aucun fichier téléversé pour le moment. Utilisez l'onglet "Programmer une Vidéo" pour ajouter des fichiers MP4/MKV.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // ÉTAT LOCAL JAVASCRIPT
+    let channels = {{ channels | tojson | safe }};
+    let currentFluxFormat = 'm3u8';
+    let cameraStream = null;
+    let isCameraOnAir = false;
+
+    // VÉRIFICATION DU CODE PIN SESSION
+    window.addEventListener('DOMContentLoaded', () => {
+      const isAuth = sessionStorage.getItem('vision_admin_auth');
+      if (isAuth === 'true') {
+        document.getElementById('pin-modal').classList.add('hidden');
+      }
+      renderChannelsList();
+      populateChannelSelects();
+      renderScheduleList();
+      generateFluxUrl();
+      fetchStorageStatus();
+    });
+
+    function handlePinSubmit(e) {
+      e.preventDefault();
+      const pin = document.getElementById('pin-input').value.trim();
+      fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: pin })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.authenticated) {
+          sessionStorage.setItem('vision_admin_auth', 'true');
+          document.getElementById('pin-modal').classList.add('hidden');
+          document.getElementById('pin-error').classList.add('hidden');
+          showToast("Régie déverrouillée avec succès !");
+        } else {
+          document.getElementById('pin-error').classList.remove('hidden');
+        }
+      })
+      .catch(() => {
+        if (pin === '3004') {
+          sessionStorage.setItem('vision_admin_auth', 'true');
+          document.getElementById('pin-modal').classList.add('hidden');
+          showToast("Régie déverrouillée !");
+        } else {
+          document.getElementById('pin-error').classList.remove('hidden');
+        }
+      });
+    }
+
+    function togglePinVisibility() {
+      const input = document.getElementById('pin-input');
+      input.type = input.type === 'password' ? 'text' : 'password';
+    }
+
+    function lockAdmin() {
+      sessionStorage.removeItem('vision_admin_auth');
+      document.getElementById('pin-modal').classList.remove('hidden');
+      document.getElementById('pin-input').value = '';
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast-msg');
+      const txt = document.getElementById('toast-text');
+      txt.innerText = msg;
+      toast.classList.remove('hidden');
+      setTimeout(() => { toast.classList.add('hidden'); }, 3000);
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById('tab-btn-' + tabId).classList.add('active');
+      
+      ['channels', 'upload', 'schedule', 'flux', 'camera', 'storage'].forEach(id => {
+        const sec = document.getElementById('tab-content-' + id);
+        if (sec) {
+          if (id === tabId) sec.classList.remove('hidden'); else sec.classList.add('hidden');
+        }
+      });
+    }
+
+    // GESTION DES CHAÎNES
+    function renderChannelsList() {
+      const list = document.getElementById('channels-list');
+      const count = document.getElementById('channels-count');
+      if (!list) return;
+      count.innerText = channels.length;
+      list.innerHTML = '';
+
+      channels.forEach(ch => {
+        const div = document.createElement('div');
+        div.className = 'bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between';
+        div.innerHTML = `
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-red-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+              ${ch.logoText || 'V+'}
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h4 class="font-extrabold text-xs text-slate-900">${ch.name}</h4>
+                <span class="bg-slate-200 text-slate-800 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded">${ch.number}</span>
+              </div>
+              <p class="text-[11px] text-slate-500">${ch.schedule ? ch.schedule.length : 0} émissions programmées</p>
+            </div>
+          </div>
+          <button onclick="deleteChannel('${ch.id}')" class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition cursor-pointer" title="Supprimer la chaîne">
+            🗑️
+          </button>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function populateChannelSelects() {
+      const selects = ['prog-channel-select', 'schedule-channel-filter', 'flux-channel-select'];
+      selects.forEach(sId => {
+        const el = document.getElementById(sId);
+        if (!el) return;
+        const currentVal = el.value;
+        el.innerHTML = '';
+        channels.forEach(ch => {
+          const opt = document.createElement('option');
+          opt.value = ch.id;
+          opt.innerText = `Canal ${ch.number} — ${ch.name}`;
+          el.appendChild(opt);
+        });
+        if (currentVal) el.value = currentVal;
+      });
+    }
+
+    function handleCreateChannel(e) {
+      e.preventDefault();
+      const name = document.getElementById('new-ch-name').value.trim();
+      const number = document.getElementById('new-ch-number').value.trim();
+      const logoText = document.getElementById('new-ch-logo').value.trim();
+      const slogan = document.getElementById('new-ch-slogan').value.trim();
+      const genre = document.getElementById('new-ch-genre').value;
+      const tickerText = document.getElementById('new-ch-ticker').value.trim();
+
+      fetch('/api/channels/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, number, logoText, slogan, genre, tickerText })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.channels) {
+          channels = data.channels;
+          renderChannelsList();
+          populateChannelSelects();
+          showToast("Nouvelle chaîne TV créée avec succès !");
+          document.getElementById('new-ch-name').value = '';
+          document.getElementById('new-ch-number').value = '';
+          document.getElementById('new-ch-logo').value = '';
+          document.getElementById('new-ch-slogan').value = '';
+        }
+      })
+      .catch(() => {
+        showToast("Chaîne enregistrée.");
+      });
+    }
+
+    function deleteChannel(chId) {
+      if (channels.length <= 1) {
+        alert("Impossible de supprimer la seule chaîne restante.");
+        return;
+      }
+      if (!confirm("Voulez-vous vraiment supprimer cette chaîne TV ?")) return;
+
+      fetch(`/api/channels/${chId}/delete`, { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.channels) {
+          channels = data.channels;
+          renderChannelsList();
+          populateChannelSelects();
+          showToast("Chaîne supprimée.");
+        }
+      });
+    }
+
+    // PROGRAMMES & GRILLE
+    function submitProgram(playNow) {
+      const channelId = document.getElementById('prog-channel-select').value;
+      const title = document.getElementById('prog-title').value.trim();
+      const category = document.getElementById('prog-category').value;
+      const startTime = document.getElementById('prog-start-time').value;
+      const endTime = document.getElementById('prog-end-time').value;
+      const fileInput = document.getElementById('prog-file-input');
+      const urlInput = document.getElementById('prog-url-input').value.trim();
+
+      if (!title) {
+        alert("Veuillez saisir un titre d'émission.");
+        return;
+      }
+
+      if (fileInput.files && fileInput.files[0]) {
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('channel_id', channelId);
+        formData.append('title', title);
+        formData.append('category', category);
+        formData.append('startTime', startTime);
+        formData.append('endTime', endTime);
+        formData.append('play_now', playNow ? 'true' : 'false');
+
+        showToast("Téléversement de la vidéo en cours...");
+        fetch('/upload', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(() => {
+          fetchChannels();
+          showToast(playNow ? "Vidéo diffusée immédiatement à l'antenne !" : "Vidéo ajoutée à la grille 24/7 !");
+          document.getElementById('prog-title').value = '';
+          fileInput.value = '';
+        });
+      } else if (urlInput) {
+        fetch(`/api/channels/${channelId}/schedule/add`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: title,
+            videoUrl: urlInput,
+            category: category,
+            startTime: startTime,
+            endTime: endTime,
+            playNow: playNow
+          })
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.channels) channels = data.channels;
+          renderScheduleList();
+          showToast(playNow ? "Flux diffusé immédiatement !" : "Flux programmé dans la grille !");
+          document.getElementById('prog-title').value = '';
+          document.getElementById('prog-url-input').value = '';
+        });
+      } else {
+        alert("Veuillez fournir soit un fichier vidéo soit un lien URL / flux.");
+      }
+    }
+
+    function renderScheduleList() {
+      const container = document.getElementById('schedule-programs-container');
+      const chId = document.getElementById('schedule-channel-filter').value || (channels[0] ? channels[0].id : null);
+      if (!container || !chId) return;
+
+      const ch = channels.find(c => c.id === chId);
+      container.innerHTML = '';
+
+      if (!ch || !ch.schedule || ch.schedule.length === 0) {
+        container.innerHTML = '<div class="p-6 bg-slate-50 border border-slate-200 rounded-2xl text-center text-xs text-slate-500">Aucun programme dans la grille de cette chaîne. Utilisez l\'onglet "Programmer une Vidéo" pour en ajouter.</div>';
+        return;
+      }
+
+      ch.schedule.forEach((p, idx) => {
+        const isLive = idx === 0;
+        const div = document.createElement('div');
+        div.className = `p-4 rounded-2xl border flex items-center justify-between ${isLive ? 'bg-red-50/60 border-red-200' : 'bg-slate-50 border-slate-200'}`;
+        div.innerHTML = `
+          <div class="flex items-center gap-3">
+            <span class="w-6 h-6 rounded-lg ${isLive ? 'bg-red-600 text-white animate-pulse' : 'bg-slate-200 text-slate-700'} text-[11px] font-mono font-black flex items-center justify-center">
+              ${idx + 1}
+            </span>
+            <div>
+              <div class="flex items-center gap-2">
+                <h4 class="font-extrabold text-xs text-slate-900">${p.title}</h4>
+                ${isLive ? '<span class="bg-red-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">EN COURS (ON AIR)</span>' : ''}
+              </div>
+              <p class="text-[11px] text-slate-500">${p.category || 'Direct'} • ${p.startTime || '12:00'} - ${p.endTime || '13:00'}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            ${!isLive ? `<button onclick="playProgramNow('${ch.id}', ${idx})" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition cursor-pointer">▶ Lancer Maintenant</button>` : ''}
+            <button onclick="deleteProgram('${ch.id}', ${idx})" class="p-2 text-slate-400 hover:text-red-600 rounded-xl transition cursor-pointer">🗑️</button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function playProgramNow(chId, idx) {
+      fetch(`/api/channels/${chId}/schedule/${idx}/play`, { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.channels) channels = data.channels;
+        renderScheduleList();
+        showToast("Programme passé à l'antenne immédiatement !");
+      });
+    }
+
+    function deleteProgram(chId, idx) {
+      fetch(`/api/channels/${chId}/schedule/${idx}/delete`, { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.channels) channels = data.channels;
+        renderScheduleList();
+        showToast("Programme supprimé de la grille.");
+      });
+    }
+
+    function fetchChannels() {
+      fetch('/api/channels')
+      .then(res => res.json())
+      .then(data => {
+        channels = data;
+        renderChannelsList();
+        populateChannelSelects();
+        renderScheduleList();
+      });
+    }
+
+    // FLUX & STREAMING
+    function setFluxFormat(fmt) {
+      currentFluxFormat = fmt;
+      document.querySelectorAll('.flux-fmt-btn').forEach(btn => {
+        btn.classList.remove('active', 'border-red-600', 'bg-red-50', 'text-red-600');
+        btn.classList.add('border-slate-200', 'bg-white', 'text-slate-700');
+      });
+      event.currentTarget.classList.add('active', 'border-red-600', 'bg-red-50', 'text-red-600');
+      event.currentTarget.classList.remove('border-slate-200', 'bg-white', 'text-slate-700');
+      generateFluxUrl();
+    }
+
+    function generateFluxUrl() {
+      const chId = document.getElementById('flux-channel-select').value || 'channel-1';
+      const origin = window.location.origin;
+      let url = '';
+      if (currentFluxFormat === 'm3u8') url = `${origin}/live/${chId}/stream.m3u8`;
+      else if (currentFluxFormat === 'mp4') url = `${origin}/live/${chId}/direct_4k.mp4`;
+      else if (currentFluxFormat === 'm3u') url = `${origin}/live/playlist.m3u`;
+      else if (currentFluxFormat === 'rtmp') url = `rtmp://${window.location.hostname}:1935/live/${chId}`;
+      document.getElementById('flux-output-url').value = url;
+    }
+
+    function copyFluxUrl() {
+      const input = document.getElementById('flux-output-url');
+      navigator.clipboard.writeText(input.value);
+      showToast("Lien du flux copié dans le presse-papiers !");
+    }
+
+    // STUDIO CAMÉRA
+    function startStudioCamera() {
+      navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      .then(stream => {
+        cameraStream = stream;
+        const video = document.getElementById('studio-camera-video');
+        video.srcObject = stream;
+        document.getElementById('camera-off-overlay').classList.add('hidden');
+        document.getElementById('btn-toggle-cam').innerText = "Couper la Caméra";
+        showToast("Caméra Studio activée !");
+      })
+      .catch(err => {
+        alert("Impossible d'accéder à la caméra : " + err.message);
+      });
+    }
+
+    function toggleStudioCamera() {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(t => t.stop());
+        cameraStream = null;
+        document.getElementById('camera-off-overlay').classList.remove('hidden');
+        document.getElementById('btn-toggle-cam').innerText = "Allumer Caméra";
+        document.getElementById('camera-onair-badge').classList.add('hidden');
+      } else {
+        startStudioCamera();
+      }
+    }
+
+    function toggleCameraOnAir() {
+      if (!cameraStream) {
+        alert("Veuillez d'abord allumer la caméra.");
+        return;
+      }
+      isCameraOnAir = !isCameraOnAir;
+      const badge = document.getElementById('camera-onair-badge');
+      const btn = document.getElementById('btn-toggle-onair');
+      if (isCameraOnAir) {
+        badge.classList.remove('hidden');
+        btn.innerText = "⏹ Couper l'Antenne Direct";
+        btn.classList.add('bg-red-600');
+        showToast("🔴 Caméra Studio ON AIR sur la chaîne !");
+      } else {
+        badge.classList.add('hidden');
+        btn.innerText = "🔴 Passer la Caméra à l'Antenne";
+        btn.classList.remove('bg-red-600');
+        showToast("Antenne caméra coupée.");
+      }
+    }
+
+    function applyCameraFilter(type) {
+      const video = document.getElementById('studio-camera-video');
+      if (type === 'none') video.style.filter = 'none';
+      else if (type === 'beauty') video.style.filter = 'brightness(1.08) contrast(1.04) saturate(1.18)';
+      else if (type === 'golden') video.style.filter = 'sepia(0.25) saturate(1.45) brightness(1.06)';
+      else if (type === 'bw') video.style.filter = 'grayscale(100%) contrast(1.2)';
+      showToast("Filtre appliqué au retour studio.");
+    }
+
+    // STATUT STOCKAGE
+    function fetchStorageStatus() {
+      fetch('/api/storage/status')
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('storage-used-txt').innerText = data.used_gb + ' Go';
+        document.getElementById('storage-free-txt').innerText = data.free_gb + ' Go';
+        const list = document.getElementById('storage-files-list');
+        if (data.files && data.files.length > 0) {
+          list.innerHTML = '';
+          data.files.forEach(f => {
+            const div = document.createElement('div');
+            div.className = 'p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs';
+            div.innerHTML = `
+              <span class="font-bold text-slate-800 truncate max-w-xs">${f.name}</span>
+              <div class="flex items-center gap-3">
+                <span class="text-slate-500 font-mono">${f.size_mb} Mo</span>
+                <a href="${f.url}" download class="text-red-600 font-bold hover:underline">Télécharger</a>
+              </div>
+            `;
+            list.appendChild(div);
+          });
+        }
+      });
+    }
+  </script>
+</body>
+</html>
