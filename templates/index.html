@@ -1,126 +1,436 @@
-<!DOCTYPE html>
-<html lang="fr">
+<!DOCTYPE html><html lang="fr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <title>DTN TV — Lecteur Style YouTube & Direct 24/7</title>
-
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-
   <style>
-    body {
-      background: #f8fafc;
-      color: #0f172a;
-    }
-
-    .video-container {
-      position: relative;
-      background: #000;
-      overflow: hidden;
-    }
-
-    video,
-    iframe {
-      width: 100%;
-      height: 100%;
-      border: 0;
-    }
-
-    .watermark {
-      position: absolute;
-      top: 18px;
-      right: 18px;
-      z-index: 20;
-      color: white;
-      background: rgba(0,0,0,.45);
-      padding: 6px 10px;
-      border-radius: 8px;
-      font-weight: 800;
-      pointer-events: none;
-    }
-
-    .cc-overlay {
-      position: absolute;
-      bottom: 75px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 30;
-      display: none;
-      color: white;
-      background: rgba(0,0,0,.75);
-      padding: 6px 12px;
-      border-radius: 6px;
-    }
-
-    .theater-mode {
-      position: fixed !important;
-      inset: 0 !important;
-      z-index: 9999 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      background: #000;
-    }
+    @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+    .animate-marquee { display: inline-block; white-space: nowrap; animation: marquee 25s linear infinite; }
   </style>
-</head>
+</head><body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col font-sans antialiased">  <!-- En-tête Blanc Lumineux -->  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 px-4 sm:px-6 py-3 shadow-xs">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">  <div class="flex items-center gap-3">
+    <div class="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center font-black text-white text-base shadow-sm">
+      {{ current_channel.logoText if current_channel else 'DTN' }}
+    </div>
 
-<body>
+    <div>
+      <div class="flex items-center gap-2">
+        <h1 class="font-extrabold text-sm sm:text-base text-slate-900">
+          Canal {{ current_channel.number if current_channel else '01' }} — {{ current_channel.name if current_channel else 'DTN TV DIRECT' }}
+        </h1>
 
-<!-- HEADER -->
-<header class="sticky top-0 z-50 bg-white border-b">
-
-  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-
-    <div class="flex items-center gap-3">
-
-      <div class="w-12 h-12 rounded-xl bg-red-600 text-white flex items-center justify-center font-black text-xl">
-        {{ current_channel.logoText if current_channel and current_channel.logoText else 'DTN' }}
+        <span class="bg-red-50 text-red-600 border border-red-200 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full">
+          4K UHD
+        </span>
       </div>
 
-      <div>
+      <p class="text-xs text-slate-500 font-medium">
+        {{ current_channel.slogan if current_channel else 'Télévision en Continu 24/7' }}
+      </p>
+    </div>
+  </div>
 
-        <div class="font-bold text-lg">
-          {{ current_channel.name if current_channel else 'DTN TV DIRECT' }}
+  <div class="flex items-center gap-3">
+    <span class="text-[11px] font-black uppercase tracking-wider text-red-600 flex items-center gap-1.5 bg-red-50 border border-red-200 px-3 py-1 rounded-full">
+      <span class="w-2 h-2 rounded-full bg-red-600 animate-ping"></span>
+      DIRECT 24/7
+    </span>
+  </div>
+
+</div>
+
+  </header>  <!-- Contenu Principal -->  <main class="max-w-7xl mx-auto p-4 sm:p-6 space-y-4 flex-1 w-full"><!-- Barre de Changement Rapide de Chaînes TV en 1 Clic -->
+<div class="bg-white border border-slate-200 rounded-2xl p-3 shadow-xs flex items-center gap-2 overflow-x-auto">
+
+  <span class="text-xs font-black text-slate-800 uppercase tracking-wider shrink-0 flex items-center gap-1.5 pr-2 border-r border-slate-200">
+    <span class="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span>
+    Chaînes TV :
+  </span>
+
+  {% for ch in channels %}
+  <a
+    href="/?channel={{ ch.id }}"
+    class="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 border {{ 'bg-red-600 text-white border-red-600 shadow-xs' if current_channel and current_channel.id == ch.id else 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200' }}"
+  >
+
+    <span class="px-1.5 py-0.5 rounded-md font-mono text-[10px] font-black {{ 'bg-black/30 text-white' if current_channel and current_channel.id == ch.id else 'bg-slate-200 text-slate-800' }}">
+      CH {{ ch.number }}
+    </span>
+
+    <span>{{ ch.name }}</span>
+
+  </a>
+  {% endfor %}
+
+</div>
+
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+  <!-- Colonne Gauche : Lecteur & Commandes -->
+  <div class="lg:col-span-2 space-y-4" id="main-player-col">
+
+    <!-- Container du Lecteur -->
+    <div class="w-full flex justify-center">
+
+      <div
+        id="player-container"
+        class="w-full aspect-video bg-black rounded-3xl overflow-hidden border border-slate-300 shadow-2xl relative group select-none flex items-center justify-center transition-all duration-300"
+      >
+
+        <!-- Vidéo Directe -->
+        <video
+          id="tv-video"
+          autoplay
+          playsinline
+          class="w-full h-full object-contain cursor-pointer transition-transform"
+          src="{{ current_channel.schedule[0].videoUrl if current_channel and current_channel.schedule and current_channel.schedule[0].videoUrl else '' }}"
+        ></video>
+
+
+        <!-- Filigrane Canal Haut Droite -->
+        <div class="absolute top-3.5 right-4 z-20 flex items-center gap-2 bg-black/70 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-white/15 pointer-events-none text-right">
+
+          <div class="text-right">
+            <span class="font-bold text-white text-xs block leading-none">
+              {{ current_channel.name if current_channel else 'DTN TV' }}
+            </span>
+
+            <span class="text-[9px] text-red-400 font-mono font-bold">
+              DIRECT 4K
+            </span>
+          </div>
+
+          <div class="w-6 h-6 rounded-lg bg-red-600 flex items-center justify-center font-black text-white text-[10px]">
+            {{ current_channel.logoText if current_channel else 'DTN' }}
+          </div>
+
         </div>
 
-        <div class="text-xs text-slate-500">
-          {{ current_channel.slogan if current_channel and current_channel.slogan else 'La télévision en direct' }}
+
+        <!-- Sous-Titres -->
+        <div id="cc-overlay" class="absolute bottom-16 inset-x-4 z-20 flex justify-center pointer-events-none hidden">
+
+          <div
+            id="cc-text"
+            class="bg-black/85 text-yellow-300 font-bold text-xs sm:text-sm px-4 py-1.5 rounded-lg border border-black/40 text-center shadow-2xl max-w-xl"
+          >
+            [Direct TV 4K] • DTN TV Diffusion en Haute Définition
+          </div>
+
+        </div>
+
+
+        <!-- Bouton Play Central -->
+        <button
+          id="center-play-btn"
+          onclick="togglePlay()"
+          class="absolute inset-0 m-auto w-16 h-12 bg-red-600 rounded-2xl flex items-center justify-center text-white shadow-2xl transition-transform hover:scale-110 z-20 hidden"
+        >
+          <svg class="w-7 h-7 fill-white ml-1" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+        </button>
+
+
+        <!-- Barre de Contrôle -->
+        <div
+          id="yt-controls"
+          class="absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/95 via-black/70 to-transparent pt-8 pb-3 px-4 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1"
+        >
+
+          <!-- Barre de Progression -->
+          <div
+            class="relative w-full group/scrub py-1 cursor-pointer flex items-center"
+            onclick="seekVideo(event)"
+          >
+
+            <div class="w-full h-1 group-hover/scrub:h-1.5 bg-white/20 rounded-full overflow-hidden relative transition-all">
+
+              <div
+                id="yt-progress-bar"
+                class="h-full bg-red-600 w-0"
+              ></div>
+
+            </div>
+
+            <div
+              id="yt-scrubber-dot"
+              class="absolute w-3 h-3 bg-red-600 rounded-full border-2 border-white pointer-events-none transform -translate-x-1/2 scale-0 group-hover/scrub:scale-100 transition-transform"
+              style="left: 0%;"
+            ></div>
+
+          </div>
+
+
+          <!-- Boutons de Contrôle -->
+          <div class="flex items-center justify-between text-white text-xs pt-1">
+
+            <div class="flex items-center gap-2">
+
+              <button
+                onclick="togglePlay()"
+                id="btn-play-pause"
+                class="p-1.5 hover:bg-white/10 rounded-lg"
+              >
+
+                <svg
+                  id="icon-pause"
+                  class="w-5 h-5 fill-white"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                </svg>
+
+                <svg
+                  id="icon-play"
+                  class="w-5 h-5 fill-white hidden"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+
+              </button>
+
+
+              <button
+                onclick="toggleMute()"
+                class="p-1.5 hover:bg-white/10 rounded-lg"
+              >
+
+                <svg
+                  class="w-5 h-5 fill-white"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                </svg>
+
+              </button>
+
+
+              <div class="font-mono text-xs text-slate-300 pl-1">
+
+                <span id="time-current">00:00</span>
+                /
+                <span id="time-total">00:00</span>
+
+                <span class="ml-2 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                  DIRECT
+                </span>
+
+              </div>
+
+            </div>
+
+
+            <div class="flex items-center gap-2">
+
+              <button
+                onclick="toggleSubtitles()"
+                id="btn-cc"
+                class="text-xs font-bold px-2 py-1 rounded bg-white/10 hover:bg-white/20"
+                title="Sous-titres (CC)"
+              >
+                CC
+              </button>
+
+
+              <button
+                onclick="changeSpeed()"
+                class="text-xs font-mono font-bold bg-white/10 px-2 py-1 rounded hover:bg-white/20"
+              >
+                <span id="speed-label">1x</span>
+              </button>
+
+
+              <button
+                onclick="downloadCurrentVideo()"
+                class="p-1.5 hover:bg-white/10 rounded-lg"
+                title="Télécharger"
+              >
+                ⬇️
+              </button>
+
+
+              <button
+                onclick="toggleTheater()"
+                class="p-1.5 hover:bg-white/10 rounded-lg"
+                title="Mode Théâtre"
+              >
+
+                <svg
+                  class="w-4 h-4 fill-white"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M19 6H5c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 10H5V8h14v8z"/>
+                </svg>
+
+              </button>
+
+
+              <button
+                onclick="toggleFullscreen()"
+                class="p-1.5 hover:bg-white/10 rounded-lg"
+                title="Grand Écran"
+              >
+
+                <svg
+                  class="w-4 h-4 fill-white"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                </svg>
+
+              </button>
+
+            </div>
+
+          </div>
+
         </div>
 
       </div>
 
     </div>
 
-    <div class="hidden sm:block">
 
-      <span class="bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold">
-        🔴 DIRECT 24/7
-      </span>
+    <!-- Informations & Actions -->
+    <div class="bg-white border border-slate-200 p-5 rounded-3xl shadow-xs space-y-3">
+
+      <div class="flex items-center justify-between">
+
+        <div class="flex items-center gap-2">
+
+          <span class="bg-red-50 text-red-600 font-black text-[10px] px-2.5 py-0.5 rounded border border-red-200">
+            {{ current_channel.schedule[0].category if current_channel and current_channel.schedule else 'DIRECT 24/7' }}
+          </span>
+
+          <span class="text-xs font-mono font-bold text-slate-700">
+            {{ current_channel.schedule[0].startTime if current_channel and current_channel.schedule else '00:00' }}
+            →
+            {{ current_channel.schedule[0].endTime if current_channel and current_channel.schedule else '23:59' }}
+          </span>
+
+        </div>
+
+        <span class="text-xs text-slate-500 font-medium">
+          Tous les jours
+        </span>
+
+      </div>
+
+
+      <h2 class="text-lg font-black text-slate-900">
+        {{ current_channel.schedule[0].title if current_channel and current_channel.schedule else 'Antenne Prête pour la Diffusion' }}
+      </h2>
+
+
+      <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+
+        <div class="flex items-center gap-3">
+
+          <div class="w-9 h-9 rounded-full bg-red-600 text-white font-black flex items-center justify-center text-xs">
+            {{ current_channel.logoText if current_channel else 'DTN' }}
+          </div>
+
+          <div>
+
+            <h3 class="text-xs font-bold text-slate-900">
+              {{ current_channel.name if current_channel else 'DTN TV' }}
+            </h3>
+
+            <p class="text-[10px] text-slate-500">
+              {{ current_channel.genre if current_channel else 'Généraliste' }}
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div class="flex items-center gap-2">
+
+          <button
+            onclick="downloadCurrentVideo()"
+            class="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold px-3.5 py-1.5 rounded-full transition border border-slate-300"
+          >
+            ⬇️ Télécharger
+          </button>
+
+          <button
+            onclick="toggleFullscreen()"
+            class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-full transition shadow-xs"
+          >
+            Grand Écran
+          </button>
+
+        </div>
+
+      </div>
 
     </div>
 
   </div>
 
 
-  <!-- BARRE DES CHAÎNES -->
-  <div class="border-t bg-slate-50 overflow-x-auto">
+  <!-- Colonne Droite : Bouquet des Chaînes TV -->
+  <div class="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-4 h-fit">
 
-    <div class="max-w-7xl mx-auto flex gap-2 p-2">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
 
-      {% for channel in channels %}
+      <h3 class="font-extrabold text-sm text-slate-900">
+        Bouquet des Chaînes TV
+      </h3>
+
+      <span class="text-xs font-bold text-slate-500">
+        {{ channels|length }} chaînes
+      </span>
+
+    </div>
+
+
+    <div class="space-y-2.5">
+
+      {% for ch in channels %}
 
       <a
-        href="/?channel={{ channel.id }}"
-        class="shrink-0 px-4 py-2 rounded-lg text-sm font-semibold
-        {% if current_channel and channel.id == current_channel.id %}
-        bg-red-600 text-white
-        {% else %}
-        bg-white border text-slate-700
-        {% endif %}"
+        href="/?channel={{ ch.id }}"
+        class="block p-3.5 rounded-2xl border transition {{ 'bg-red-50/70 border-red-300 shadow-2xs' if current_channel and current_channel.id == ch.id else 'border-slate-200 bg-white hover:bg-slate-50' }}"
       >
 
-        {{ channel.name }}
+        <div class="flex items-center justify-between">
+
+          <div class="flex items-center gap-3">
+
+            <span class="px-2 py-0.5 rounded-lg font-mono text-xs font-black {{ 'bg-red-600 text-white' if current_channel and current_channel.id == ch.id else 'bg-slate-100 text-slate-700' }}">
+              CH {{ ch.number }}
+            </span>
+
+            <div>
+
+              <span class="font-extrabold block text-slate-900 text-xs">
+                {{ ch.name }}
+              </span>
+
+              <span class="text-[11px] text-slate-500">
+                {{ ch.genre }}
+              </span>
+
+            </div>
+
+          </div>
+
+
+          {% if current_channel and current_channel.id == ch.id %}
+
+          <span class="text-[10px] text-emerald-600 font-bold font-mono">
+            ● EN DIRECT
+          </span>
+
+          {% endif %}
+
+        </div>
 
       </a>
 
@@ -130,1065 +440,326 @@
 
   </div>
 
-</header>
+</div>
 
+  </main>  <script>
 
-<main class="max-w-7xl mx-auto px-4 py-5">
+    const video = document.getElementById('tv-video');
+    const container = document.getElementById('player-container');
+    const progressBar = document.getElementById('yt-progress-bar');
+    const scrubberDot = document.getElementById('yt-scrubber-dot');
 
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+    const timeCur = document.getElementById('time-current');
+    const timeTot = document.getElementById('time-total');
 
+    const iconPlay = document.getElementById('icon-play');
+    const iconPause = document.getElementById('icon-pause');
 
-    <!-- LECTEUR -->
-    <section class="lg:col-span-2">
+    const centerPlayBtn = document.getElementById('center-play-btn');
 
-      <div
-        id="player-container"
-        class="video-container aspect-video rounded-2xl shadow-xl"
-      >
+    const speedLabel = document.getElementById('speed-label');
 
-        <!-- LECTEUR VIDÉO -->
-        <video
-          id="tv-video"
-          autoplay
-          playsinline
-          preload="metadata"
-          class="w-full h-full object-contain"
-        ></video>
+    const ccOverlay = document.getElementById('cc-overlay');
+    const btnCc = document.getElementById('btn-cc');
 
+    let ccActive = false;
 
-        <!-- LECTEUR YOUTUBE -->
-        <iframe
-          id="youtube-player"
-          class="hidden w-full h-full"
-          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-          allowfullscreen
-        ></iframe>
 
+    function fmt(s) {
 
-        <!-- WATERMARK -->
-        <div class="watermark">
+      if (isNaN(s)) return '00:00';
 
-          <span id="watermark-logo">
-            {{ current_channel.logoText if current_channel and current_channel.logoText else 'DTN' }}
-          </span>
+      const m = Math.floor(s / 60)
+        .toString()
+        .padStart(2, '0');
 
-          <span> TV</span>
+      const sec = Math.floor(s % 60)
+        .toString()
+        .padStart(2, '0');
 
-        </div>
+      return m + ':' + sec;
 
+    }
 
-        <!-- SOUS-TITRES -->
-        <div id="cc-overlay" class="cc-overlay">
-          Sous-titres activés
-        </div>
 
-      </div>
+    if (video) {
 
+      video.addEventListener('timeupdate', () => {
 
-      <!-- CONTRÔLES -->
-      <div class="mt-3 bg-slate-900 text-white rounded-xl p-3">
+        if (video.duration) {
 
-        <div class="flex items-center gap-2 flex-wrap">
+          const pct =
+            (video.currentTime / video.duration) * 100;
 
+          progressBar.style.width = pct + '%';
 
-          <!-- PLAY -->
-          <button
-            onclick="togglePlay()"
-            class="px-4 py-2 bg-slate-700 rounded-lg hover:bg-slate-600"
-          >
-            ▶️ / ⏸️
-          </button>
+          scrubberDot.style.left = pct + '%';
 
+          timeCur.innerText =
+            fmt(video.currentTime);
 
-          <!-- MUTE -->
-          <button
-            onclick="toggleMute()"
-            class="px-4 py-2 bg-slate-700 rounded-lg hover:bg-slate-600"
-          >
-            🔊
-          </button>
+          timeTot.innerText =
+            fmt(video.duration);
 
+        }
 
-          <!-- PROGRESSION -->
-          <input
-            id="progress"
-            type="range"
-            min="0"
-            max="100"
-            value="0"
-            class="flex-1 min-w-[120px]"
-            oninput="seekVideo(this.value)"
-          >
+      });
 
 
-          <!-- VITESSE -->
-          <select
-            onchange="changeSpeed(this.value)"
-            class="bg-slate-700 rounded-lg px-3 py-2"
-          >
+      video.addEventListener('play', () => {
 
-            <option value="1">1x</option>
-            <option value="1.25">1.25x</option>
-            <option value="1.5">1.5x</option>
-            <option value="2">2x</option>
-            <option value="0.5">0.5x</option>
+        iconPause.classList.remove('hidden');
+        iconPlay.classList.add('hidden');
 
-          </select>
+        centerPlayBtn.classList.add('hidden');
 
+      });
 
-          <!-- CC -->
-          <button
-            onclick="toggleSubtitles()"
-            class="px-4 py-2 bg-slate-700 rounded-lg"
-          >
-            CC
-          </button>
 
+      video.addEventListener('pause', () => {
 
-          <!-- DOWNLOAD -->
-          <button
-            onclick="downloadCurrentVideo()"
-            class="px-4 py-2 bg-slate-700 rounded-lg"
-          >
-            ⬇️
-          </button>
+        iconPause.classList.add('hidden');
+        iconPlay.classList.remove('hidden');
 
+        centerPlayBtn.classList.remove('hidden');
 
-          <!-- CINÉMA -->
-          <button
-            onclick="toggleTheater()"
-            class="px-4 py-2 bg-slate-700 rounded-lg"
-          >
-            🎬
-          </button>
+      });
 
 
-          <!-- PLEIN ÉCRAN -->
-          <button
-            onclick="toggleFullscreen()"
-            class="px-4 py-2 bg-slate-700 rounded-lg"
-          >
-            ⛶
-          </button>
+      video.addEventListener('click', togglePlay);
 
-        </div>
+    }
 
-      </div>
 
+    function togglePlay() {
 
-      <!-- INFORMATIONS -->
-      <div class="mt-4 bg-white rounded-2xl border p-5">
+      if (video.paused)
+        video.play();
+      else
+        video.pause();
 
-        <div class="text-sm text-red-600 font-bold">
-          {{ current_channel.category if current_channel and current_channel.category else 'TV' }}
-        </div>
+    }
 
 
-        <h1 class="text-2xl font-black mt-1">
-          {{ current_channel.name if current_channel else 'DTN TV' }}
-        </h1>
+    function toggleMute() {
 
+      video.muted = !video.muted;
 
-        <p class="text-slate-500 mt-2">
-          {{ current_channel.slogan if current_channel else 'DTN TV Diffusion en Haute Définition' }}
-        </p>
+    }
 
 
-        <!-- TYPE DE SOURCE -->
-        <div
-          id="source-type"
-          class="mt-3 inline-block bg-slate-100 px-3 py-1 rounded-full text-xs font-semibold"
-        >
-          Détection de la source...
-        </div>
+    function seekVideo(e) {
 
-      </div>
+      const rect =
+        e.currentTarget.getBoundingClientRect();
 
-    </section>
+      const pos =
+        (e.clientX - rect.left) / rect.width;
 
+      if (video.duration) {
 
-    <!-- BOUQUET -->
-    <aside>
-
-      <div class="bg-white border rounded-2xl p-4 shadow-sm">
-
-        <h2 class="font-black text-xl mb-4">
-          📺 Bouquet des Chaînes TV
-        </h2>
-
-
-        <div class="space-y-2">
-
-          {% for channel in channels %}
-
-          <a
-            href="/?channel={{ channel.id }}"
-            class="block p-3 rounded-xl border hover:bg-slate-50
-            {% if current_channel and channel.id == current_channel.id %}
-            border-red-500 bg-red-50
-            {% endif %}"
-          >
-
-            <div class="flex items-center gap-3">
-
-              <div class="w-10 h-10 rounded-lg bg-red-600 text-white flex items-center justify-center font-bold">
-                {{ channel.logoText if channel.logoText else 'TV' }}
-              </div>
-
-
-              <div>
-
-                <div class="font-bold">
-                  {{ channel.name }}
-                </div>
-
-                <div class="text-xs text-slate-500">
-                  {{ channel.category if channel.category else 'Télévision' }}
-                </div>
-
-              </div>
-
-            </div>
-
-          </a>
-
-          {% endfor %}
-
-        </div>
-
-      </div>
-
-    </aside>
-
-  </div>
-
-</main>
-
-
-<script>
-
-/*
-|--------------------------------------------------------------------------
-| VARIABLES
-|--------------------------------------------------------------------------
-*/
-
-const video = document.getElementById("tv-video");
-const youtubePlayer = document.getElementById("youtube-player");
-const playerContainer = document.getElementById("player-container");
-const progress = document.getElementById("progress");
-const sourceType = document.getElementById("source-type");
-
-let hls = null;
-
-
-/*
-|--------------------------------------------------------------------------
-| URL FOURNIE PAR FLASK
-|--------------------------------------------------------------------------
-*/
-
-const sourceUrl = {{ (
-  current_channel.schedule[0].videoUrl
-  if current_channel
-  and current_channel.schedule
-  and current_channel.schedule|length > 0
-  and current_channel.schedule[0].videoUrl
-  else ''
-)|tojson }};
-
-
-/*
-|--------------------------------------------------------------------------
-| NETTOYAGE URL
-|--------------------------------------------------------------------------
-*/
-
-function cleanUrl(url) {
-
-  if (!url) return "";
-
-  return String(url).trim();
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| DÉTECTION YOUTUBE
-|--------------------------------------------------------------------------
-*/
-
-function getYouTubeId(url) {
-
-  if (!url) return null;
-
-  try {
-
-    const parsed = new URL(url);
-
-    const hostname = parsed.hostname.toLowerCase();
-
-
-    /*
-    | youtube.com/watch?v=
-    */
-
-    if (
-      hostname === "youtube.com" ||
-      hostname === "www.youtube.com" ||
-      hostname === "m.youtube.com"
-    ) {
-
-      if (parsed.pathname === "/watch") {
-
-        return parsed.searchParams.get("v");
-
-      }
-
-
-      /*
-      | /embed/VIDEO
-      */
-
-      if (parsed.pathname.startsWith("/embed/")) {
-
-        return parsed.pathname
-          .split("/embed/")[1]
-          .split("/")[0];
-
-      }
-
-
-      /*
-      | /shorts/VIDEO
-      */
-
-      if (parsed.pathname.startsWith("/shorts/")) {
-
-        return parsed.pathname
-          .split("/shorts/")[1]
-          .split("/")[0];
+        video.currentTime =
+          pos * video.duration;
 
       }
 
     }
 
 
-    /*
-    | youtu.be/VIDEO
-    */
+    const speeds =
+      [1, 1.25, 1.5, 2, 0.5];
 
-    if (hostname === "youtu.be") {
+    let spIdx = 0;
 
-      return parsed.pathname
-        .substring(1)
-        .split("/")[0];
+
+    function changeSpeed() {
+
+      spIdx =
+        (spIdx + 1) % speeds.length;
+
+      video.playbackRate =
+        speeds[spIdx];
+
+      speedLabel.innerText =
+        speeds[spIdx] + 'x';
 
     }
 
-  } catch (error) {
 
-    console.log("URL YouTube invalide");
+    function toggleSubtitles() {
 
-  }
+      ccActive = !ccActive;
 
-  return null;
+      if (ccActive) {
 
-}
+        ccOverlay.classList.remove('hidden');
 
+        btnCc.classList.add(
+          'bg-red-600',
+          'text-white'
+        );
 
-/*
-|--------------------------------------------------------------------------
-| DÉTECTION DU TYPE
-|--------------------------------------------------------------------------
-*/
+      } else {
 
-function detectSourceType(url) {
+        ccOverlay.classList.add('hidden');
 
-  const lower = url.toLowerCase();
+        btnCc.classList.remove(
+          'bg-red-600',
+          'text-white'
+        );
 
+      }
 
-  if (getYouTubeId(url)) {
+    }
 
-    return "YouTube";
 
-  }
+    function downloadCurrentVideo() {
 
+      if (!video || !video.src) {
 
-  if (
-    lower.includes(".m3u8") ||
-    lower.includes("mpegurl")
-  ) {
+        alert("Aucune vidéo chargée.");
 
-    return "Flux HLS";
+        return;
 
-  }
+      }
 
+      const a =
+        document.createElement('a');
 
-  if (
-    lower.includes(".mp4") ||
-    lower.includes(".m4v")
-  ) {
+      a.href =
+        video.src;
 
-    return "Vidéo MP4";
+      a.download =
+        'dtn_tv_video.mp4';
 
-  }
+      a.target =
+        '_blank';
 
+      document.body.appendChild(a);
 
-  if (
-    lower.includes(".webm")
-  ) {
+      a.click();
 
-    return "Vidéo WebM";
+      document.body.removeChild(a);
 
-  }
+    }
 
 
-  if (
-    lower.includes(".ogg") ||
-    lower.includes(".ogv")
-  ) {
+    function toggleFullscreen() {
 
-    return "Vidéo OGG";
+      if (!document.fullscreenElement) {
 
-  }
+        container
+          .requestFullscreen()
+          .catch(() => {});
 
+      } else {
 
-  if (
-    lower.includes(".mov")
-  ) {
+        document.exitFullscreen();
 
-    return "Vidéo MOV";
+      }
 
-  }
+    }
 
 
-  return "Source vidéo directe";
+    let theaterActive = false;
 
-}
 
+    function toggleTheater() {
 
-/*
-|--------------------------------------------------------------------------
-| LECTURE YOUTUBE
-|--------------------------------------------------------------------------
-*/
+      theaterActive =
+        !theaterActive;
 
-function loadYouTube(videoId) {
+      const col =
+        document.getElementById(
+          'main-player-col'
+        );
 
-  video.pause();
-  video.removeAttribute("src");
-  video.load();
 
-  video.classList.add("hidden");
+      if (theaterActive) {
 
-  youtubePlayer.classList.remove("hidden");
+        col.classList.remove(
+          'lg:col-span-2'
+        );
 
+        col.classList.add(
+          'lg:col-span-3'
+        );
 
-  youtubePlayer.src =
-    "https://www.youtube.com/embed/" +
-    encodeURIComponent(videoId) +
-    "?autoplay=1&rel=0";
+      } else {
 
+        col.classList.remove(
+          'lg:col-span-3'
+        );
 
-  sourceType.textContent = "YouTube";
+        col.classList.add(
+          'lg:col-span-2'
+        );
 
-}
+      }
 
+    }
 
-/*
-|--------------------------------------------------------------------------
-| LECTURE HLS
-|--------------------------------------------------------------------------
-*/
 
-function loadHLS(url) {
+    window.addEventListener(
+      'keydown',
+      (e) => {
 
-  youtubePlayer.src = "";
+        if (
+          ['INPUT', 'TEXTAREA']
+          .includes(e.target.tagName)
+        )
+          return;
 
-  youtubePlayer.classList.add("hidden");
 
-  video.classList.remove("hidden");
+        if (
+          e.key === ' ' ||
+          e.key === 'k'
+        ) {
 
+          e.preventDefault();
 
-  sourceType.textContent = "Flux HLS (.m3u8)";
+          togglePlay();
 
+        }
 
-  if (hls) {
 
-    hls.destroy();
+        if (e.key === 'f') {
 
-    hls = null;
+          e.preventDefault();
 
-  }
+          toggleFullscreen();
 
+        }
 
-  /*
-  | Chrome / Android / Firefox
-  */
 
-  if (typeof Hls !== "undefined" && Hls.isSupported()) {
+        if (e.key === 'm') {
 
-    hls = new Hls({
+          e.preventDefault();
 
-      enableWorker: true,
+          toggleMute();
 
-      lowLatencyMode: true,
+        }
 
-      backBufferLength: 90,
 
-      maxBufferLength: 30
+        if (e.key === 't') {
 
-    });
+          e.preventDefault();
 
+          toggleTheater();
 
-    hls.loadSource(url);
+        }
 
-    hls.attachMedia(video);
 
+        if (e.key === 'c') {
 
-    hls.on(
-      Hls.Events.MANIFEST_PARSED,
-      function() {
+          e.preventDefault();
 
-        video.play().catch(() => {});
+          toggleSubtitles();
+
+        }
 
       }
     );
 
-
-    hls.on(
-      Hls.Events.ERROR,
-      function(event, data) {
-
-        console.log("Erreur HLS :", data);
-
-      }
-    );
-
-
-    return;
-
-  }
-
-
-  /*
-  | Safari / navigateurs HLS natifs
-  */
-
-  if (
-    video.canPlayType(
-      "application/vnd.apple.mpegurl"
-    )
-  ) {
-
-    video.src = url;
-
-    video.addEventListener(
-      "loadedmetadata",
-      function() {
-
-        video.play().catch(() => {});
-
-      },
-      { once: true }
-    );
-
-    return;
-
-  }
-
-
-  alert(
-    "Ce navigateur ne prend pas en charge ce flux HLS."
-  );
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| VIDÉO DIRECTE
-|--------------------------------------------------------------------------
-*/
-
-function loadDirectVideo(url) {
-
-  youtubePlayer.src = "";
-
-  youtubePlayer.classList.add("hidden");
-
-  video.classList.remove("hidden");
-
-
-  if (hls) {
-
-    hls.destroy();
-
-    hls = null;
-
-  }
-
-
-  sourceType.textContent =
-    detectSourceType(url);
-
-
-  video.src = url;
-
-  video.load();
-
-  video.play().catch(() => {});
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| CHARGEMENT PRINCIPAL
-|--------------------------------------------------------------------------
-*/
-
-function loadSource(url) {
-
-  url = cleanUrl(url);
-
-
-  if (!url) {
-
-    sourceType.textContent =
-      "Aucune source vidéo";
-
-    return;
-
-  }
-
-
-  console.log("Source chargée :", url);
-
-
-  /*
-  | YOUTUBE
-  */
-
-  const youtubeId =
-    getYouTubeId(url);
-
-
-  if (youtubeId) {
-
-    loadYouTube(youtubeId);
-
-    return;
-
-  }
-
-
-  /*
-  | HLS
-  */
-
-  if (
-    url.toLowerCase().includes(".m3u8") ||
-    url.toLowerCase().includes("mpegurl")
-  ) {
-
-    loadHLS(url);
-
-    return;
-
-  }
-
-
-  /*
-  | AUTRES VIDÉOS DIRECTES
-  */
-
-  loadDirectVideo(url);
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| PLAY / PAUSE
-|--------------------------------------------------------------------------
-*/
-
-function togglePlay() {
-
-  /*
-  | YouTube utilise son propre lecteur
-  */
-
-  if (!youtubePlayer.classList.contains("hidden")) {
-
-    return;
-
-  }
-
-
-  if (video.paused) {
-
-    video.play().catch(() => {});
-
-  } else {
-
-    video.pause();
-
-  }
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| MUTE
-|--------------------------------------------------------------------------
-*/
-
-function toggleMute() {
-
-  if (!youtubePlayer.classList.contains("hidden")) {
-
-    return;
-
-  }
-
-  video.muted = !video.muted;
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| PROGRESSION
-|--------------------------------------------------------------------------
-*/
-
-video.addEventListener(
-  "timeupdate",
-  function() {
-
-    if (
-      !video.duration ||
-      !isFinite(video.duration)
-    ) {
-
-      return;
-
-    }
-
-
-    progress.value =
-      (video.currentTime /
-      video.duration) * 100;
-
-  }
-);
-
-
-function seekVideo(value) {
-
-  if (
-    !video.duration ||
-    !isFinite(video.duration)
-  ) {
-
-    return;
-
-  }
-
-
-  video.currentTime =
-    (Number(value) / 100) *
-    video.duration;
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| VITESSE
-|--------------------------------------------------------------------------
-*/
-
-function changeSpeed(speed) {
-
-  if (!youtubePlayer.classList.contains("hidden")) {
-
-    return;
-
-  }
-
-
-  video.playbackRate =
-    Number(speed);
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| SOUS-TITRES
-|--------------------------------------------------------------------------
-*/
-
-function toggleSubtitles() {
-
-  const overlay =
-    document.getElementById("cc-overlay");
-
-
-  if (
-    overlay.style.display === "block"
-  ) {
-
-    overlay.style.display = "none";
-
-  } else {
-
-    overlay.style.display = "block";
-
-
-    setTimeout(
-      function() {
-
-        overlay.style.display = "none";
-
-      },
-      2000
-    );
-
-  }
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| TÉLÉCHARGEMENT
-|--------------------------------------------------------------------------
-*/
-
-function downloadCurrentVideo() {
-
-  /*
-  | YouTube
-  */
-
-  if (!youtubePlayer.classList.contains("hidden")) {
-
-    alert(
-      "Le téléchargement direct d'une vidéo YouTube n'est pas disponible dans ce lecteur."
-    );
-
-    return;
-
-  }
-
-
-  const url =
-    video.currentSrc ||
-    video.src;
-
-
-  if (!url) {
-
-    alert(
-      "Aucune vidéo disponible."
-    );
-
-    return;
-
-  }
-
-
-  /*
-  | HLS
-  */
-
-  if (
-    url.includes(".m3u8")
-  ) {
-
-    alert(
-      "Un flux HLS (.m3u8) est destiné à la lecture en ligne."
-    );
-
-    return;
-
-  }
-
-
-  /*
-  | Téléchargement des fichiers directs
-  */
-
-  const link =
-    document.createElement("a");
-
-
-  link.href = url;
-
-  link.download =
-    "dtn_tv_video";
-
-
-  document.body.appendChild(link);
-
-  link.click();
-
-  link.remove();
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| PLEIN ÉCRAN
-|--------------------------------------------------------------------------
-*/
-
-function toggleFullscreen() {
-
-  if (!document.fullscreenElement) {
-
-    if (
-      playerContainer.requestFullscreen
-    ) {
-
-      playerContainer
-        .requestFullscreen()
-        .catch(() => {});
-
-    }
-
-  } else {
-
-    document.exitFullscreen();
-
-  }
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| MODE CINÉMA
-|--------------------------------------------------------------------------
-*/
-
-function toggleTheater() {
-
-  playerContainer
-    .classList
-    .toggle("theater-mode");
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| ERREURS VIDÉO
-|--------------------------------------------------------------------------
-*/
-
-video.addEventListener(
-  "error",
-  function() {
-
-    console.log(
-      "Impossible de lire cette source vidéo."
-    );
-
-  }
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| RACCOURCIS CLAVIER
-|--------------------------------------------------------------------------
-*/
-
-document.addEventListener(
-  "keydown",
-  function(event) {
-
-    if (
-      event.target.tagName === "INPUT" ||
-      event.target.tagName === "SELECT"
-    ) {
-
-      return;
-
-    }
-
-
-    switch (
-      event.key.toLowerCase()
-    ) {
-
-      case " ":
-
-        event.preventDefault();
-
-        togglePlay();
-
-        break;
-
-
-      case "k":
-
-        togglePlay();
-
-        break;
-
-
-      case "f":
-
-        toggleFullscreen();
-
-        break;
-
-
-      case "m":
-
-        toggleMute();
-
-        break;
-
-
-      case "t":
-
-        toggleTheater();
-
-        break;
-
-
-      case "c":
-
-        toggleSubtitles();
-
-        break;
-
-    }
-
-  }
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| DÉMARRAGE
-|--------------------------------------------------------------------------
-*/
-
-loadSource(sourceUrl);
-
-</script>
-
-</body>
+  </script></body>
   </html>
