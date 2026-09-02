@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  vision_tv:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./media_storage_2tb:/app/media_storage_2tb
+      - ./channels_db.json:/app/channels_db.json
+    environment:
+      - PORT=3000
+      - ADMIN_PIN=3004
+      - SECRET_KEY=vision_tv_production_key_2026
+    restart: always

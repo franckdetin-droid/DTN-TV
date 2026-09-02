@@ -1,0 +1,7 @@
+#EXTM3U x-tvg-url=""
+#EXTINF:-1 tvg-id="channel-1" tvg-name="VISION+ DIRECT 1" tvg-logo="V+1" group-title="VISION+ TV",Canal 01 - VISION+ DIRECT 1
+http://localhost:3000/api/stream/channel-1
+#EXTINF:-1 tvg-id="channel-2" tvg-name="VISION+ INFO & SÉRIES" tvg-logo="V+2" group-title="VISION+ TV",Canal 02 - VISION+ INFO & SÉRIES
+http://localhost:3000/api/stream/channel-2
+#EXTINF:-1 tvg-id="channel-3" tvg-name="VISION+ LIVE & ÉVÉNEMENTS" tvg-logo="V+3" group-title="VISION+ TV",Canal 03 - VISION+ LIVE & ÉVÉNEMENTS
+http://localhost:3000/api/stream/channel-3

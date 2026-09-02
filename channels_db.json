@@ -1,0 +1,14 @@
+[
+  {
+    "id": "channel-3",
+    "name": "VISION+ LIVE & ÉVÉNEMENTS",
+    "number": "03",
+    "logoText": "V+3",
+    "slogan": "Retransmissions Spéciales & Événements",
+    "genre": "Direct & Événements",
+    "badgeColor": "bg-red-600",
+    "tickerActive": true,
+    "tickerText": "★ DIRECT ÉVÉNEMENT : Plateau en direct, concerts et retransmissions exclusives.",
+    "schedule": []
+  }
+]
