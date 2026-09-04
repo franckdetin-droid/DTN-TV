@@ -3,8 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Régie & Administration TV — VISION+ 24/7</title>
+  <title>Régie & Administration TV — DTN TV 24/7</title>
+  <script>window.DTN TV = {{ (channel_mode or false) | tojson }}; window.VISION_CHANNEL_ID = {{ (channel_id or "") | tojson }};</script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @media (max-width: 640px) {
+      #studio-camera-stage { aspect-ratio: 9 / 16; min-height: 0; max-height: 78vh; }
+      #studio-camera-video { object-fit: cover; }
+    }
+  
+      button, .rounded-xl, .rounded-2xl, .rounded-3xl { border-radius: 1rem; }
+    </style>
   <style>
     .tab-btn.active {
       background-color: #dc2626;
@@ -23,7 +32,7 @@
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col font-sans antialiased">
   
-  <!-- MODAL DE VERROUILLAGE PIN 3004 -->
+  <!-- MODAL D'ACCÈS -->
   <div id="pin-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6 text-center">
       <div class="w-16 h-16 rounded-2xl bg-red-50 border border-red-200 text-red-600 flex items-center justify-center mx-auto text-2xl shadow-inner">
@@ -31,8 +40,8 @@
       </div>
       
       <div class="space-y-1.5">
-        <h2 class="text-xl font-black text-slate-900">Régie Sécurisée</h2>
-        <p class="text-xs text-slate-500 font-medium">
+        <h2 class="text-xl font-black text-slate-900" id="auth-title">Régie Sécurisée</h2>
+        <p class="text-xs text-slate-500 font-medium" id="auth-description">
           Saisissez le code PIN administrateur pour gérer les chaînes, diffuser des flux et configurer la grille.
         </p>
       </div>
@@ -42,7 +51,7 @@
           <input 
             type="password" 
             id="pin-input" 
-            placeholder="Code PIN (ex: 3004)"
+            placeholder="Code PIN"
             class="w-full bg-slate-50 border border-slate-300 focus:border-red-600 focus:ring-2 focus:ring-red-600/20 rounded-2xl px-4 py-3.5 text-center text-lg font-black tracking-widest text-slate-900 outline-none transition"
             required 
             autocomplete="current-password"
@@ -57,7 +66,7 @@
         </div>
 
         <p id="pin-error" class="text-xs font-bold text-red-600 hidden">
-          ⚠️ Code PIN incorrect. Le code par défaut est 3004.
+          ⚠️ Identifiants incorrects.
         </p>
 
         <div class="flex items-center gap-2 pt-2">
@@ -71,7 +80,7 @@
       </form>
       
       <div class="pt-2 border-t border-slate-100">
-        <span class="text-[11px] font-mono text-slate-400">PIN d'accès d'usine : <strong class="text-slate-600">3004</strong></span>
+        <span class="text-[11px] font-mono text-slate-400" id="auth-footer">Accès protégé</span>
       </div>
     </div>
   </div>
@@ -98,9 +107,9 @@
       </div>
 
       <div class="flex items-center gap-2">
-        <span class="hidden md:flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-3 py-1.5 rounded-xl">
+        <span id="storage-server-badge" class="hidden md:flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-3 py-1.5 rounded-xl">
           <span class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
-          Serveur 2 To En Ligne
+          Stockage connecté
         </span>
         <button onclick="lockAdmin()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-xl border border-slate-200 transition cursor-pointer">
           🔒 Verrouiller
@@ -229,7 +238,7 @@
           <span class="bg-red-50 text-red-600 border border-red-200 text-xs font-bold px-3 py-1 rounded-xl">24/7 DIRECT</span>
         </div>
 
-        <form id="upload-prog-form" onsubmit="handleProgramSubmit(event)" class="space-y-4">
+        <form id="upload-prog-form" onsubmit="event.preventDefault(); submitProgram(false)" class="space-y-4">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="text-xs font-bold text-slate-700 block mb-1">Chaîne Cible</label>
@@ -265,6 +274,35 @@
                 <span class="text-xs text-slate-400 font-bold">à</span>
                 <input type="time" id="prog-end-time" value="21:30" class="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 outline-none" />
               </div>
+              <p class="text-[10px] text-slate-400 mt-1">Pour un fichier vidéo, la fin est calculée automatiquement à partir de sa durée.</p>
+              <label class="flex items-center gap-2 mt-2 text-[11px] font-bold text-slate-700">
+                <input type="checkbox" id="prog-live-mode">
+                Flux en direct sans heure de fin
+              </label>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <label class="text-xs font-black text-slate-900 block mb-2">Jours de diffusion</label>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-bold">
+                <label><input type="checkbox" class="prog-day" value="Lundi" checked> Lundi</label>
+                <label><input type="checkbox" class="prog-day" value="Mardi" checked> Mardi</label>
+                <label><input type="checkbox" class="prog-day" value="Mercredi" checked> Mercredi</label>
+                <label><input type="checkbox" class="prog-day" value="Jeudi" checked> Jeudi</label>
+                <label><input type="checkbox" class="prog-day" value="Vendredi" checked> Vendredi</label>
+                <label><input type="checkbox" class="prog-day" value="Samedi" checked> Samedi</label>
+                <label><input type="checkbox" class="prog-day" value="Dimanche" checked> Dimanche</label>
+              </div>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+              <div class="flex items-center justify-between gap-3">
+                <label class="text-xs font-bold text-slate-700">Durée (secondes)</label>
+                <input type="number" id="prog-duration" min="1" placeholder="Auto" class="w-32 bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold outline-none" />
+              </div>
+              <label class="flex items-center gap-2 text-[11px] font-bold text-slate-700"><input type="checkbox" id="prog-auto-end" checked> Calculer automatiquement l'heure de fin</label>
+              <label class="flex items-center gap-2 text-[11px] font-bold text-slate-700"><input type="checkbox" id="prog-auto-next" checked> Passer automatiquement au programme suivant</label>
+              <label class="flex items-center gap-2 text-[11px] font-bold text-slate-700"><input type="checkbox" id="prog-auto-start"> Commencer après le programme précédent</label>
             </div>
           </div>
 
@@ -383,8 +421,17 @@
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         <!-- Écran Retour Caméra -->
-        <div class="lg:col-span-2 bg-black rounded-3xl overflow-hidden border border-slate-300 shadow-2xl relative aspect-video flex items-center justify-center">
+        <div id="studio-camera-stage" class="lg:col-span-2 bg-black rounded-3xl overflow-hidden border border-slate-300 shadow-2xl relative aspect-video sm:min-h-[560px] flex items-center justify-center">
           <video id="studio-camera-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
+
+          <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2 overflow-x-auto max-w-[92%] px-2 py-1 bg-black/55 backdrop-blur-md rounded-2xl border border-white/10">
+            <button onclick="applyCameraFilter('none')" class="px-3 py-2 rounded-xl bg-white/15 text-white text-[11px] font-bold whitespace-nowrap">✨ Naturel</button>
+            <button onclick="applyCameraFilter('beauty')" class="px-3 py-2 rounded-xl bg-white/15 text-white text-[11px] font-bold whitespace-nowrap">🌸 Éclat</button>
+            <button onclick="applyCameraFilter('golden')" class="px-3 py-2 rounded-xl bg-white/15 text-white text-[11px] font-bold whitespace-nowrap">🌅 Golden</button>
+            <button onclick="applyCameraFilter('bw')" class="px-3 py-2 rounded-xl bg-white/15 text-white text-[11px] font-bold whitespace-nowrap">🎬 N&B</button>
+            <button onclick="applyCameraFilter('cool')" class="px-3 py-2 rounded-xl bg-white/15 text-white text-[11px] font-bold whitespace-nowrap">❄️ Cool</button>
+            <button onclick="applyCameraFilter('vivid')" class="px-3 py-2 rounded-xl bg-white/15 text-white text-[11px] font-bold whitespace-nowrap">💎 Vivid</button>
+          </div>
           
           <div id="camera-off-overlay" class="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-6 text-center space-y-3">
             <div class="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center text-3xl">
@@ -441,43 +488,45 @@
       </div>
     </section>
 
-    <!-- ONGLET 6 : STOCKAGE 2 TO & SERVEUR -->
+    <!-- ONGLET 6 : STOCKAGE PERSONNEL -->
     <section id="tab-content-storage" class="space-y-6 hidden">
       <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-6">
-        <div class="border-b border-slate-100 pb-4 flex items-center justify-between">
+        <div class="border-b border-slate-100 pb-4 flex items-center justify-between gap-3">
           <div>
-            <h2 class="text-base font-black text-slate-900 flex items-center gap-2">
-              <span>💾</span> Espace de Stockage Dédié 2 To
-            </h2>
-            <p class="text-xs text-slate-500">Diffusion haute performance avec streaming HTTP 206 Partial Content</p>
+            <h2 class="text-base font-black text-slate-900 flex items-center gap-2"><span>💾</span> Stockage personnel</h2>
+            <p class="text-xs text-slate-500">Fichiers persistants, dossiers, recherche, renommage et liens privés.</p>
           </div>
-          <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-3 py-1 rounded-xl">
-            2048 Go Total
-          </span>
+          <span id="storage-backend-badge" class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-3 py-1 rounded-xl">STOCKAGE</span>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center">
-            <span class="text-xs text-slate-500 font-bold block mb-1">Capacité Maximale</span>
-            <span class="text-2xl font-black text-slate-900">2048 Go</span>
+            <span class="text-xs text-slate-500 font-bold block mb-1">Capacité</span>
+            <span id="storage-capacity-txt" class="text-2xl font-black text-slate-900">2048 Go</span>
           </div>
           <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center">
-            <span class="text-xs text-slate-500 font-bold block mb-1">Espace Utilisé</span>
-            <span id="storage-used-txt" class="text-2xl font-black text-red-600">0.00 Go</span>
+            <span class="text-xs text-slate-500 font-bold block mb-1">Utilisé</span>
+            <span id="storage-used-txt" class="text-2xl font-black text-red-600">0 Go</span>
           </div>
           <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center">
-            <span class="text-xs text-slate-500 font-bold block mb-1">Espace Libre</span>
+            <span class="text-xs text-slate-500 font-bold block mb-1">Libre</span>
             <span id="storage-free-txt" class="text-2xl font-black text-emerald-600">2048 Go</span>
           </div>
         </div>
 
-        <div>
-          <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider mb-3">Fichiers Vidéos dans le Stockage :</h3>
-          <div id="storage-files-list" class="space-y-2">
-            <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-center text-xs text-slate-500">
-              Aucun fichier téléversé pour le moment. Utilisez l'onglet "Programmer une Vidéo" pour ajouter des fichiers MP4/MKV.
-            </div>
-          </div>
+        <div class="flex flex-col sm:flex-row gap-2">
+          <input id="storage-search" type="search" placeholder="🔎 Rechercher un fichier..." oninput="loadStorageFiles()" class="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold outline-none" />
+          <input id="storage-folder-name" type="text" placeholder="Nom du dossier" class="sm:w-48 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold outline-none" />
+          <button onclick="createStorageFolder()" class="bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-xl">📁 Nouveau dossier</button>
+          <label class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer text-center">
+            ⬆ Envoyer
+            <input id="storage-upload-input" type="file" multiple class="hidden" onchange="uploadStorageFiles(event)" />
+          </label>
+        </div>
+
+        <div id="storage-folders-list" class="flex flex-wrap gap-2"></div>
+        <div id="storage-files-list" class="space-y-2">
+          <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-center text-xs text-slate-500">Chargement...</div>
         </div>
       </div>
     </section>
@@ -490,10 +539,24 @@
     let currentFluxFormat = 'm3u8';
     let cameraStream = null;
     let isCameraOnAir = false;
+    const cameraPeerConnections = new Map();
+    let cameraOfferPoll = null;
+    const CSRF_TOKEN = "{{ csrf_token }}";
+    const nativeFetch = window.fetch.bind(window);
+    async function apiFetch(url, options = {}) {
+      options.headers = options.headers || {};
+      const h = new Headers(options.headers);
+      const token = sessionStorage.getItem('vision_csrf') || CSRF_TOKEN;
+      if (token) h.set('X-CSRF-Token', token);
+      options.headers = h;
+      return nativeFetch(url, options);
+    }
+
 
     // VÉRIFICATION DU CODE PIN SESSION
     window.addEventListener('DOMContentLoaded', () => {
-      const isAuth = sessionStorage.getItem('vision_admin_auth');
+      const authKey = window.VISION_CHANNEL_MODE ? 'vision_channel_auth_' + window.VISION_CHANNEL_ID : 'vision_admin_auth';
+      const isAuth = sessionStorage.getItem(authKey);
       if (isAuth === 'true') {
         document.getElementById('pin-modal').classList.add('hidden');
       }
@@ -502,36 +565,43 @@
       renderScheduleList();
       generateFluxUrl();
       fetchStorageStatus();
+      if (window.VISION_CHANNEL_MODE) {
+        document.querySelectorAll('[onclick^=\"deleteChannel\"]').forEach(x => x.classList.add('hidden'));
+        const createForms = document.querySelectorAll('form');
+        createForms.forEach(f => { if ((f.innerText || '').toLowerCase().includes('créer une chaîne')) f.classList.add('hidden'); });
+      }
     });
 
     function handlePinSubmit(e) {
       e.preventDefault();
-      const pin = document.getElementById('pin-input').value.trim();
-      fetch('/api/auth', {
+      const value = document.getElementById('pin-input').value.trim();
+      const endpoint = window.VISION_CHANNEL_MODE ? '/api/channel-auth' : '/api/auth';
+      const payload = window.VISION_CHANNEL_MODE ? { channel_id: window.VISION_CHANNEL_ID, password: value } : { pin: value };
+      apiFetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: pin })
+        body: JSON.stringify(payload)
       })
       .then(res => res.json())
       .then(data => {
         if (data.authenticated) {
-          sessionStorage.setItem('vision_admin_auth', 'true');
+          sessionStorage.setItem(window.VISION_CHANNEL_MODE ? 'vision_channel_auth_' + window.VISION_CHANNEL_ID : 'vision_admin_auth', 'true');
+          if (data.csrf_token) sessionStorage.setItem('vision_csrf', data.csrf_token);
           document.getElementById('pin-modal').classList.add('hidden');
           document.getElementById('pin-error').classList.add('hidden');
-          showToast("Régie déverrouillée avec succès !");
+          showToast(window.VISION_CHANNEL_MODE ? 'Espace de la chaîne déverrouillé !' : 'Régie déverrouillée avec succès !');
         } else {
           document.getElementById('pin-error').classList.remove('hidden');
         }
       })
-      .catch(() => {
-        if (pin === '3004') {
-          sessionStorage.setItem('vision_admin_auth', 'true');
-          document.getElementById('pin-modal').classList.add('hidden');
-          showToast("Régie déverrouillée !");
-        } else {
-          document.getElementById('pin-error').classList.remove('hidden');
-        }
-      });
+      .catch(() => { document.getElementById('pin-error').classList.remove('hidden'); });
+    }
+
+    if (window.VISION_CHANNEL_MODE) {
+      document.getElementById('auth-title').innerText = 'Administration de la chaîne';
+      document.getElementById('auth-description').innerText = 'Entrez le mot de passe choisi pour gérer cette chaîne, ses vidéos, sa programmation et ses liens de diffusion.';
+      document.getElementById('pin-input').placeholder = 'Mot de passe de la chaîne';
+      document.getElementById('auth-footer').innerText = 'Accès réservé à cette chaîne';
     }
 
     function togglePinVisibility() {
@@ -540,7 +610,10 @@
     }
 
     function lockAdmin() {
-      sessionStorage.removeItem('vision_admin_auth');
+      const endpoint = window.VISION_CHANNEL_MODE ? '/api/channel-logout' : '/api/logout';
+      nativeFetch(endpoint, { method: 'POST', headers: { 'X-CSRF-Token': sessionStorage.getItem('vision_csrf') || '' } }).catch(() => {});
+      sessionStorage.removeItem(window.VISION_CHANNEL_MODE ? 'vision_channel_auth_' + window.VISION_CHANNEL_ID : 'vision_admin_auth');
+      sessionStorage.removeItem('vision_csrf');
       document.getElementById('pin-modal').classList.remove('hidden');
       document.getElementById('pin-input').value = '';
     }
@@ -623,7 +696,7 @@
       const genre = document.getElementById('new-ch-genre').value;
       const tickerText = document.getElementById('new-ch-ticker').value.trim();
 
-      fetch('/api/channels/add', {
+      apiFetch('/api/channels/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, number, logoText, slogan, genre, tickerText })
@@ -653,7 +726,7 @@
       }
       if (!confirm("Voulez-vous vraiment supprimer cette chaîne TV ?")) return;
 
-      fetch(`/api/channels/${chId}/delete`, { method: 'POST' })
+      apiFetch(`/api/channels/${chId}/delete`, { method: 'POST' })
       .then(res => res.json())
       .then(data => {
         if (data.channels) {
@@ -666,62 +739,118 @@
     }
 
     // PROGRAMMES & GRILLE
-    function submitProgram(playNow) {
+    function getSelectedDays() {
+      const days = Array.from(document.querySelectorAll('.prog-day:checked')).map(x => x.value);
+      return days.length === 7 ? ["Tous les jours"] : (days.length ? days : ["Tous les jours"]);
+    }
+
+    function updateAutoEndFromDuration() {
+      const live = document.getElementById('prog-live-mode')?.checked;
+      const duration = parseInt(document.getElementById('prog-duration').value || '0', 10);
+      const start = document.getElementById('prog-start-time').value;
+      if (live || !duration || !start || !document.getElementById('prog-auto-end').checked) return;
+      const [h,m] = start.split(':').map(Number);
+      const total = h * 60 + m + Math.ceil(duration / 60);
+      document.getElementById('prog-end-time').value =
+        `${String(Math.floor((total % 1440) / 60)).padStart(2,'0')}:${String(total % 60).padStart(2,'0')}`;
+    }
+
+    function updateLiveModeUI() {
+      const live = document.getElementById('prog-live-mode')?.checked;
+      const end = document.getElementById('prog-end-time');
+      const duration = document.getElementById('prog-duration');
+      if (live) {
+        end.value = '';
+        end.disabled = true;
+        duration.value = '';
+        duration.disabled = true;
+        document.getElementById('prog-auto-end').checked = false;
+      } else {
+        end.disabled = false;
+        duration.disabled = false;
+        document.getElementById('prog-auto-end').checked = true;
+        updateAutoEndFromDuration();
+      }
+    }
+
+    document.getElementById('prog-live-mode')?.addEventListener('change', updateLiveModeUI);
+
+    document.getElementById('prog-file-input')?.addEventListener('change', () => {
+      const file = document.getElementById('prog-file-input').files[0];
+      if (!file) return;
+      const probe = document.createElement('video');
+      probe.preload = 'metadata';
+      probe.onloadedmetadata = () => {
+        if (Number.isFinite(probe.duration) && probe.duration > 0) {
+          document.getElementById('prog-duration').value = Math.ceil(probe.duration);
+          updateAutoEndFromDuration();
+        }
+        URL.revokeObjectURL(probe.src);
+      };
+      probe.src = URL.createObjectURL(file);
+    });
+    document.getElementById('prog-start-time')?.addEventListener('change', updateAutoEndFromDuration);
+    document.getElementById('prog-duration')?.addEventListener('input', updateAutoEndFromDuration);
+
+    async function submitProgram(playNow) {
       const channelId = document.getElementById('prog-channel-select').value;
       const title = document.getElementById('prog-title').value.trim();
       const category = document.getElementById('prog-category').value;
       const startTime = document.getElementById('prog-start-time').value;
       const endTime = document.getElementById('prog-end-time').value;
+      const durationSeconds = parseInt(document.getElementById('prog-duration').value || '0', 10);
+      const days = getSelectedDays();
+      const autoEnd = document.getElementById('prog-auto-end').checked;
+      const autoNext = document.getElementById('prog-auto-next').checked;
+      const autoStart = document.getElementById('prog-auto-start').checked;
+      const isLive = document.getElementById('prog-live-mode')?.checked || false;
       const fileInput = document.getElementById('prog-file-input');
       const urlInput = document.getElementById('prog-url-input').value.trim();
 
-      if (!title) {
-        alert("Veuillez saisir un titre d'émission.");
-        return;
-      }
+      if (!title) return alert("Veuillez saisir un titre d'émission.");
+      if (!fileInput.files?.[0] && !urlInput) return alert("Veuillez fournir un fichier vidéo ou un lien.");
+      if (!startTime) return alert("Veuillez choisir une heure de début.");
 
-      if (fileInput.files && fileInput.files[0]) {
-        const formData = new FormData();
-        formData.append('file', fileInput.files[0]);
-        formData.append('channel_id', channelId);
-        formData.append('title', title);
-        formData.append('category', category);
-        formData.append('startTime', startTime);
-        formData.append('endTime', endTime);
-        formData.append('play_now', playNow ? 'true' : 'false');
-
-        showToast("Téléversement de la vidéo en cours...");
-        fetch('/upload', { method: 'POST', body: formData })
-        .then(res => res.json())
-        .then(() => {
-          fetchChannels();
-          showToast(playNow ? "Vidéo diffusée immédiatement à l'antenne !" : "Vidéo ajoutée à la grille 24/7 !");
-          document.getElementById('prog-title').value = '';
-          fileInput.value = '';
-        });
-      } else if (urlInput) {
-        fetch(`/api/channels/${channelId}/schedule/add`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: title,
-            videoUrl: urlInput,
-            category: category,
-            startTime: startTime,
-            endTime: endTime,
-            playNow: playNow
-          })
-        })
-        .then(res => res.json())
-        .then(data => {
-          if (data.channels) channels = data.channels;
-          renderScheduleList();
-          showToast(playNow ? "Flux diffusé immédiatement !" : "Flux programmé dans la grille !");
-          document.getElementById('prog-title').value = '';
-          document.getElementById('prog-url-input').value = '';
-        });
-      } else {
-        alert("Veuillez fournir soit un fichier vidéo soit un lien URL / flux.");
+      try {
+        let res, data;
+        if (fileInput.files?.[0]) {
+          const formData = new FormData();
+          formData.append('file', fileInput.files[0]);
+          formData.append('channel_id', channelId);
+          formData.append('title', title);
+          formData.append('category', category);
+          formData.append('startTime', startTime);
+          formData.append('endTime', autoEnd ? '' : endTime);
+          formData.append('durationSeconds', String(durationSeconds || 0));
+          formData.append('days', JSON.stringify(days));
+          formData.append('autoEnd', String(autoEnd));
+          formData.append('autoNext', String(autoNext));
+          formData.append('autoStart', String(autoStart));
+          formData.append('play_now', playNow ? 'true' : 'false');
+          formData.append('isLive', String(isLive));
+          res = await apiFetch('/upload', { method: 'POST', body: formData });
+        } else {
+          res = await apiFetch(`/api/channels/${channelId}/schedule/add`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title, videoUrl: urlInput, category, startTime,
+              endTime: autoEnd ? null : endTime,
+              durationSeconds, days, autoEnd, autoNext, autoStart, playNow, isLive,
+              mediaType: isLive ? 'live' : 'video'
+            })
+          });
+        }
+        data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Erreur lors de l'enregistrement");
+        if (data.channels) channels = data.channels;
+        fetchChannels();
+        showToast(playNow ? "Programme passé à l'antenne." : "Programme ajouté à la grille.");
+        document.getElementById('prog-title').value = '';
+        document.getElementById('prog-url-input').value = '';
+        fileInput.value = '';
+      } catch (err) {
+        showToast(err.message || "Erreur réseau");
       }
     }
 
@@ -739,24 +868,24 @@
       }
 
       ch.schedule.forEach((p, idx) => {
-        const isLive = idx === 0;
+        const isOnAir = idx === 0;
         const div = document.createElement('div');
-        div.className = `p-4 rounded-2xl border flex items-center justify-between ${isLive ? 'bg-red-50/60 border-red-200' : 'bg-slate-50 border-slate-200'}`;
+        div.className = `p-4 rounded-2xl border flex items-center justify-between ${isOnAir ? 'bg-red-50/60 border-red-200' : 'bg-slate-50 border-slate-200'}`;
         div.innerHTML = `
           <div class="flex items-center gap-3">
-            <span class="w-6 h-6 rounded-lg ${isLive ? 'bg-red-600 text-white animate-pulse' : 'bg-slate-200 text-slate-700'} text-[11px] font-mono font-black flex items-center justify-center">
+            <span class="w-6 h-6 rounded-lg ${isOnAir ? 'bg-red-600 text-white animate-pulse' : 'bg-slate-200 text-slate-700'} text-[11px] font-mono font-black flex items-center justify-center">
               ${idx + 1}
             </span>
             <div>
               <div class="flex items-center gap-2">
                 <h4 class="font-extrabold text-xs text-slate-900">${p.title}</h4>
-                ${isLive ? '<span class="bg-red-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">EN COURS (ON AIR)</span>' : ''}
+                ${isOnAir ? '<span class="bg-red-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">EN COURS (ON AIR)</span>' : ''}
               </div>
-              <p class="text-[11px] text-slate-500">${p.category || 'Direct'} • ${p.startTime || '12:00'} - ${p.endTime || '13:00'}</p>
+              <p class="text-[11px] text-slate-500">${p.category || 'Direct'} • ${p.startTime || '12:00'} - ${p.endTime || (p.isLive ? 'LIVE' : '13:00')} • ${(p.day || ['Tous les jours']).join ? (p.day || ['Tous les jours']).join(', ') : p.day || 'Tous les jours'}</p>
             </div>
           </div>
           <div class="flex items-center gap-2">
-            ${!isLive ? `<button onclick="playProgramNow('${ch.id}', ${idx})" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition cursor-pointer">▶ Lancer Maintenant</button>` : ''}
+            ${!isOnAir ? `<button onclick="playProgramNow('${ch.id}', ${idx})" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition cursor-pointer">▶ Lancer Maintenant</button>` : ''}
             <button onclick="deleteProgram('${ch.id}', ${idx})" class="p-2 text-slate-400 hover:text-red-600 rounded-xl transition cursor-pointer">🗑️</button>
           </div>
         `;
@@ -765,7 +894,7 @@
     }
 
     function playProgramNow(chId, idx) {
-      fetch(`/api/channels/${chId}/schedule/${idx}/play`, { method: 'POST' })
+      apiFetch(`/api/channels/${chId}/schedule/${idx}/play`, { method: 'POST' })
       .then(res => res.json())
       .then(data => {
         if (data.channels) channels = data.channels;
@@ -775,7 +904,7 @@
     }
 
     function deleteProgram(chId, idx) {
-      fetch(`/api/channels/${chId}/schedule/${idx}/delete`, { method: 'POST' })
+      apiFetch(`/api/channels/${chId}/schedule/${idx}/delete`, { method: 'POST' })
       .then(res => res.json())
       .then(data => {
         if (data.channels) channels = data.channels;
@@ -785,7 +914,7 @@
     }
 
     function fetchChannels() {
-      fetch('/api/channels')
+      apiFetch('/api/channels')
       .then(res => res.json())
       .then(data => {
         channels = data;
@@ -852,7 +981,7 @@
       }
     }
 
-    function toggleCameraOnAir() {
+    async function toggleCameraOnAir() {
       if (!cameraStream) {
         alert("Veuillez d'abord allumer la caméra.");
         return;
@@ -860,17 +989,70 @@
       isCameraOnAir = !isCameraOnAir;
       const badge = document.getElementById('camera-onair-badge');
       const btn = document.getElementById('btn-toggle-onair');
+      const channelId = document.getElementById('prog-channel-select')?.value;
+      if (!channelId) { isCameraOnAir = false; alert("Sélectionnez une chaîne."); return; }
       if (isCameraOnAir) {
-        badge.classList.remove('hidden');
-        btn.innerText = "⏹ Couper l'Antenne Direct";
-        btn.classList.add('bg-red-600');
-        showToast("🔴 Caméra Studio ON AIR sur la chaîne !");
+        try {
+          await apiFetch(`/api/camera/${encodeURIComponent(channelId)}/register`, { method: 'POST' });
+          badge.classList.remove('hidden');
+          btn.innerText = "⏹ Couper l'Antenne Direct";
+          btn.classList.add('bg-red-600');
+          startCameraBroadcastSignaling(channelId);
+          showToast("🔴 Caméra Studio ON AIR : les spectateurs peuvent la voir.");
+        } catch (e) {
+          isCameraOnAir = false;
+          alert("Impossible de passer la caméra à l'antenne.");
+        }
       } else {
+        stopCameraBroadcastSignaling();
+        try { await apiFetch(`/api/camera/${encodeURIComponent(channelId)}/stop`, { method: 'POST' }); } catch(e) {}
         badge.classList.add('hidden');
         btn.innerText = "🔴 Passer la Caméra à l'Antenne";
         btn.classList.remove('bg-red-600');
         showToast("Antenne caméra coupée.");
       }
+    }
+
+    function waitForIceGathering(pc) {
+      if (pc.iceGatheringState === 'complete') return Promise.resolve();
+      return new Promise(resolve => {
+        const done = () => { if (pc.iceGatheringState === 'complete') { pc.removeEventListener('icegatheringstatechange', done); resolve(); } };
+        pc.addEventListener('icegatheringstatechange', done);
+        setTimeout(resolve, 5000);
+      });
+    }
+
+    async function startCameraBroadcastSignaling(channelId) {
+      stopCameraBroadcastSignaling();
+      cameraOfferPoll = setInterval(async () => {
+        try {
+          const r = await apiFetch(`/api/camera/${encodeURIComponent(channelId)}/offers`, { cache: 'no-store' });
+          if (!r.ok) return;
+          const data = await r.json();
+          for (const item of (data.offers || [])) {
+            if (cameraPeerConnections.has(item.viewerId)) continue;
+            const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+            cameraPeerConnections.set(item.viewerId, pc);
+            if (cameraStream) cameraStream.getTracks().forEach(track => pc.addTrack(track, cameraStream));
+            await pc.setRemoteDescription(item.offer);
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            await waitForIceGathering(pc);
+            await apiFetch(`/api/camera/${encodeURIComponent(channelId)}/answer/${encodeURIComponent(item.viewerId)}`, {
+              method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({answer: pc.localDescription})
+            });
+            pc.onconnectionstatechange = () => {
+              if (['failed','closed','disconnected'].includes(pc.connectionState)) { pc.close(); cameraPeerConnections.delete(item.viewerId); }
+            };
+          }
+        } catch (e) {}
+      }, 800);
+    }
+
+    function stopCameraBroadcastSignaling() {
+      if (cameraOfferPoll) { clearInterval(cameraOfferPoll); cameraOfferPoll = null; }
+      cameraPeerConnections.forEach(pc => { try { pc.close(); } catch(e) {} });
+      cameraPeerConnections.clear();
     }
 
     function applyCameraFilter(type) {
@@ -882,30 +1064,129 @@
       showToast("Filtre appliqué au retour studio.");
     }
 
-    // STATUT STOCKAGE
-    function fetchStorageStatus() {
-      fetch('/api/storage/status')
-      .then(res => res.json())
-      .then(data => {
+    // STOCKAGE PERSONNEL
+    let currentStorageFolder = null;
+
+    async function fetchStorageStatus() {
+      try {
+        const res = await apiFetch('/api/storage/status');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erreur stockage');
+        document.getElementById('storage-capacity-txt').innerText = data.max_capacity_gb + ' Go';
         document.getElementById('storage-used-txt').innerText = data.used_gb + ' Go';
         document.getElementById('storage-free-txt').innerText = data.free_gb + ' Go';
-        const list = document.getElementById('storage-files-list');
-        if (data.files && data.files.length > 0) {
-          list.innerHTML = '';
-          data.files.forEach(f => {
-            const div = document.createElement('div');
-            div.className = 'p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs';
-            div.innerHTML = `
-              <span class="font-bold text-slate-800 truncate max-w-xs">${f.name}</span>
-              <div class="flex items-center gap-3">
-                <span class="text-slate-500 font-mono">${f.size_mb} Mo</span>
-                <a href="${f.url}" download class="text-red-600 font-bold hover:underline">Télécharger</a>
-              </div>
-            `;
-            list.appendChild(div);
-          });
-        }
+        document.getElementById('storage-backend-badge').innerText = 'STOCKAGE ' + String(data.backend).toUpperCase();
+        document.getElementById('storage-server-badge').innerText = 'Stockage ' + String(data.backend).toUpperCase() + ' connecté';
+        loadStorageFolders();
+        loadStorageFiles();
+      } catch (e) {
+        document.getElementById('storage-files-list').innerHTML =
+          `<div class="p-4 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-700">${e.message}</div>`;
+      }
+    }
+
+    async function loadStorageFolders() {
+      const res = await apiFetch('/api/storage/folders');
+      const data = await res.json();
+      const list = document.getElementById('storage-folders-list');
+      list.innerHTML = `<button onclick="setStorageFolder(null)" class="px-3 py-1.5 rounded-xl text-xs font-bold border ${currentStorageFolder===null?'bg-red-600 text-white':'bg-slate-50 text-slate-700'}">📦 Racine</button>`;
+      (data.folders || []).filter(f => f.parent_id === null).forEach(f => {
+        const btn = document.createElement('button');
+        btn.className = `px-3 py-1.5 rounded-xl text-xs font-bold border ${currentStorageFolder===f.id?'bg-red-600 text-white':'bg-slate-50 text-slate-700'}`;
+        btn.innerText = '📁 ' + f.name;
+        btn.onclick = () => setStorageFolder(f.id);
+        list.appendChild(btn);
       });
+    }
+
+    function setStorageFolder(id) {
+      currentStorageFolder = id;
+      loadStorageFolders();
+      loadStorageFiles();
+    }
+
+    async function loadStorageFiles() {
+      const q = encodeURIComponent(document.getElementById('storage-search')?.value.trim() || '');
+      const folder = currentStorageFolder === null ? '' : `&folder_id=${currentStorageFolder}`;
+      const res = await apiFetch(`/api/storage/files?q=${q}${folder}`);
+      const data = await res.json();
+      const list = document.getElementById('storage-files-list');
+      list.innerHTML = '';
+      if (!data.files?.length) {
+        list.innerHTML = '<div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-center text-xs text-slate-500">Aucun fichier.</div>';
+        return;
+      }
+      data.files.forEach(f => {
+        const div = document.createElement('div');
+        div.className = 'p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs';
+        div.innerHTML = `
+          <div class="min-w-0"><div class="font-bold text-slate-800 truncate">${escapeHtml(f.name)}</div><div class="text-slate-500">${f.size_mb} Mo • ${escapeHtml(f.mime_type || 'fichier')}</div></div>
+          <div class="flex flex-wrap items-center gap-2">
+            <a href="${f.url}" class="text-red-600 font-bold px-2 py-1 rounded-lg bg-red-50">Télécharger</a>
+            <button onclick="renameStorageFile(${f.id}, ${JSON.stringify(f.name)})" class="px-2 py-1 rounded-lg bg-white border">Renommer</button>
+            <button onclick="shareStorageFile(${f.id})" class="px-2 py-1 rounded-lg bg-white border">🔗 Partager</button>
+            <button onclick="deleteStorageFile(${f.id})" class="px-2 py-1 rounded-lg bg-white border text-red-600">🗑️</button>
+          </div>`;
+        list.appendChild(div);
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    async function uploadStorageFiles(e) {
+      const files = Array.from(e.target.files || []);
+      for (const file of files) {
+        const fd = new FormData();
+        fd.append('file', file);
+        if (currentStorageFolder !== null) fd.append('folder_id', currentStorageFolder);
+        showToast('Envoi : ' + file.name);
+        const res = await apiFetch('/upload', {method:'POST', body:fd});
+        const data = await res.json();
+        if (!res.ok) showToast(data.error || 'Échec de l’envoi');
+      }
+      e.target.value = '';
+      fetchStorageStatus();
+    }
+
+    async function createStorageFolder() {
+      const name = document.getElementById('storage-folder-name').value.trim();
+      if (!name) return alert('Entrez un nom de dossier.');
+      const res = await apiFetch('/api/storage/folders', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name, parent_id:currentStorageFolder})
+      });
+      const data = await res.json();
+      if (!res.ok) return alert(data.error || 'Impossible de créer le dossier');
+      document.getElementById('storage-folder-name').value='';
+      loadStorageFolders();
+    }
+
+    async function renameStorageFile(id, oldName) {
+      const name = prompt('Nouveau nom du fichier', oldName);
+      if (!name || name === oldName) return;
+      const res = await apiFetch(`/api/storage/files/${id}`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+      const data = await res.json();
+      if (!res.ok) return alert(data.error || 'Renommage impossible');
+      loadStorageFiles();
+    }
+
+    async function deleteStorageFile(id) {
+      if (!confirm('Supprimer définitivement ce fichier ?')) return;
+      const res = await apiFetch(`/api/storage/files/${id}`, {method:'DELETE'});
+      const data = await res.json();
+      if (!res.ok) return alert(data.error || 'Suppression impossible');
+      fetchStorageStatus();
+    }
+
+    async function shareStorageFile(id) {
+      const choice = prompt('Expiration en minutes. Exemples : 30, 60, 1440. Laissez vide pour sans expiration.');
+      if (choice === null) return;
+      const res = await apiFetch(`/api/share/${id}`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expirationMinutes:choice || null})});
+      const data = await res.json();
+      if (!res.ok) return alert(data.error || 'Impossible de créer le lien');
+      prompt('Lien privé à copier', data.url);
     }
   </script>
 </body>
