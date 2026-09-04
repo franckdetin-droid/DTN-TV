@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   vision_tv:
     build: .
@@ -7,8 +6,12 @@ services:
     volumes:
       - ./media_storage_2tb:/app/media_storage_2tb
       - ./channels_db.json:/app/channels_db.json
+      - ./storage_data:/app/storage_data
     environment:
-      - PORT=3000
-      - ADMIN_PIN=3004
-      - SECRET_KEY=vision_tv_production_key_2026
+      PORT: 3000
+      ADMIN_PIN: "3004"
+      SECRET_KEY: "change-me"
+      DATABASE_URL: "sqlite:////app/storage_data/storage.sqlite3"
+      STORAGE_BACKEND: "local"
+      STORAGE_CAPACITY_GB: "2048"
     restart: always

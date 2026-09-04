@@ -1,5 +1,81 @@
 [
   {
+    "id": "channel-1",
+    "name": "VISION+ DIRECT 1",
+    "number": "01",
+    "logoText": "V+1",
+    "slogan": "Diffusion Principale Haute Définition 24/7",
+    "genre": "Généraliste & Direct",
+    "badgeColor": "bg-red-600",
+    "tickerActive": true,
+    "tickerText": "★ VISION+ DIRECT : Bienvenue sur votre chaîne. Utilisez la Régie pour diffuser vos vidéos, flux ou directs caméra.",
+    "schedule": [
+      {
+        "id": "prog-c1-live",
+        "title": "Plateau VISION+ TV — Antenne Principale",
+        "category": "Direct Continu",
+        "description": "Canal prêt pour la diffusion de vos fichiers vidéos (MP4, MKV), flux Facebook/YouTube ou studio en direct.",
+        "presenter": "Régie VISION+",
+        "mediaType": "video",
+        "videoUrl": "",
+        "durationSeconds": 3600,
+        "day": "Tous les jours",
+        "startTime": "00:00",
+        "endTime": "23:59",
+        "notes": "Antenne Ouverte — HD 4K",
+        "subtitles": {
+          "fr": "Bienvenue sur VISION+ TV. La diffusion est active en haute définition.",
+          "en": "Welcome to VISION+ TV. High definition broadcast is currently active.",
+          "es": "Bienvenido a VISION+ TV. La transmisión en alta definición está activa."
+        }
+      },
+      {
+        "id": "prog-1788341806366",
+        "startTime": "20:30",
+        "endTime": "20:40",
+        "title": "Ej",
+        "category": "Long-Métrage Cinéma",
+        "description": "Diffusion haute définition 4K de Ej.",
+        "day": "Tous les jours",
+        "videoUrl": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+        "mediaType": "video",
+        "notes": "10 min • Haute Définition"
+      }
+    ]
+  },
+  {
+    "id": "channel-2",
+    "name": "VISION+ INFO & SÉRIES",
+    "number": "02",
+    "logoText": "V+2",
+    "slogan": "Actualités, Séries & Événements",
+    "genre": "Information & Fictions",
+    "badgeColor": "bg-red-600",
+    "tickerActive": true,
+    "tickerText": "★ VISION+ INFO : Fil d'information continue et retransmissions spéciales.",
+    "schedule": [
+      {
+        "id": "prog-c2-live",
+        "title": "Journal & Programmation Continue",
+        "category": "Information",
+        "description": "Antenne dédiée aux reportages, séries et émissions thématiques programmées.",
+        "presenter": "Rédaction",
+        "mediaType": "video",
+        "videoUrl": "",
+        "durationSeconds": 3600,
+        "day": "Tous les jours",
+        "startTime": "00:00",
+        "endTime": "23:59",
+        "notes": "Diffusion 24/7",
+        "subtitles": {
+          "fr": "Édition spéciale d'information VISION+ TV.",
+          "en": "Special news edition on VISION+ TV.",
+          "es": "Edición especial de noticias en VISION+ TV."
+        }
+      }
+    ]
+  },
+  {
     "id": "channel-3",
     "name": "VISION+ LIVE & ÉVÉNEMENTS",
     "number": "03",
@@ -9,6 +85,26 @@
     "badgeColor": "bg-red-600",
     "tickerActive": true,
     "tickerText": "★ DIRECT ÉVÉNEMENT : Plateau en direct, concerts et retransmissions exclusives.",
-    "schedule": []
+    "schedule": [
+      {
+        "id": "prog-c3-live",
+        "title": "Canal Événementiel & Direct",
+        "category": "Événementiel",
+        "description": "Retransmissions spéciales et flux live haute définition sans interruption.",
+        "presenter": "Équipe Technique",
+        "mediaType": "video",
+        "videoUrl": "",
+        "durationSeconds": 3600,
+        "day": "Tous les jours",
+        "startTime": "00:00",
+        "endTime": "23:59",
+        "notes": "Direct Événement",
+        "subtitles": {
+          "fr": "Canal Événements en direct — Son stéréo haute fidélité.",
+          "en": "Live Events Channel — High fidelity stereo audio.",
+          "es": "Canal de Eventos en vivo — Audio estéreo de alta fidelidad."
+        }
+      }
+    ]
   }
 ]
