@@ -1,4 +1,4 @@
-# VISION+ TV — Régie TV + stockage personnel
+# DTN TV — Régie TV + stockage personnel
 
 Cette version conserve l'interface et les couleurs existantes, mais arrondit les contrôles et ajoute un vrai conducteur de programmes ainsi qu'un stockage de fichiers configurable.
 

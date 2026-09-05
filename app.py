@@ -1,5 +1,5 @@
 # ==============================================================================
-# VISION+ TV — Régie TV + stockage personnel persistant configurable
+# DTN TV — Régie TV + stockage personnel persistant configurable
 # ==============================================================================
 
 import os
@@ -48,6 +48,16 @@ class ChannelAccount(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     active = db.Column(db.Boolean, default=True)
 
+class AnalyticsEvent(db.Model):
+    __tablename__ = "analytics_events"
+    id = db.Column(db.Integer, primary_key=True)
+    event_type = db.Column(db.String(32), nullable=False, index=True)
+    channel_id = db.Column(db.String(128), nullable=True, index=True)
+    program_id = db.Column(db.String(128), nullable=True, index=True)
+    program_title = db.Column(db.String(255), nullable=True)
+    visitor_id = db.Column(db.String(128), nullable=True, index=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+
 def channel_account(channel_id):
     return ChannelAccount.query.filter_by(channel_id=channel_id, active=True).first()
 
@@ -64,72 +74,6 @@ def channel_admin_required(channel_id):
     if not can_manage_channel(channel_id):
         return jsonify({"error": "Accès administrateur de la chaîne requis"}), 401
     return None
-# Caméra live WebRTC (signalisation légère, adaptée à une instance Railway unique)
-CAMERA_SESSIONS = {}
-
-def camera_session(channel_id):
-    return CAMERA_SESSIONS.get(channel_id)
-
-@app.post("/api/camera/<channel_id>/register")
-def camera_register(channel_id):
-    if not can_manage_channel(channel_id):
-        return jsonify({"error": "Accès administrateur requis"}), 401
-    CAMERA_SESSIONS[channel_id] = {"active": True, "offers": {}, "answers": {}, "updated": datetime.now(timezone.utc).isoformat()}
-    return jsonify({"ok": True, "active": True})
-
-@app.post("/api/camera/<channel_id>/stop")
-def camera_stop(channel_id):
-    if not can_manage_channel(channel_id):
-        return jsonify({"error": "Accès administrateur requis"}), 401
-    CAMERA_SESSIONS.pop(channel_id, None)
-    return jsonify({"ok": True, "active": False})
-
-@app.get("/api/camera/<channel_id>/status")
-def camera_status(channel_id):
-    sess = camera_session(channel_id)
-    return jsonify({"active": bool(sess and sess.get("active"))})
-
-@app.post("/api/camera/<channel_id>/offer")
-def camera_offer(channel_id):
-    sess = camera_session(channel_id)
-    if not sess or not sess.get("active"):
-        return jsonify({"error": "Caméra hors antenne"}), 404
-    data = request.get_json(silent=True) or {}
-    offer = data.get("offer")
-    viewer_id = str(uuid.uuid4())
-    if not offer:
-        return jsonify({"error": "Offer manquante"}), 400
-    sess["offers"][viewer_id] = offer
-    sess["answers"].setdefault(viewer_id, None)
-    return jsonify({"viewerId": viewer_id})
-
-@app.get("/api/camera/<channel_id>/offers")
-def camera_offers(channel_id):
-    if not can_manage_channel(channel_id):
-        return jsonify({"error": "Accès administrateur requis"}), 401
-    sess = camera_session(channel_id)
-    if not sess or not sess.get("active"):
-        return jsonify({"offers": []})
-    return jsonify({"offers": [{"viewerId": vid, "offer": offer} for vid, offer in sess["offers"].items() if not sess["answers"].get(vid)]})
-
-@app.post("/api/camera/<channel_id>/answer/<viewer_id>")
-def camera_answer(channel_id, viewer_id):
-    if not can_manage_channel(channel_id):
-        return jsonify({"error": "Accès administrateur requis"}), 401
-    sess = camera_session(channel_id)
-    if not sess or viewer_id not in sess.get("offers", {}):
-        return jsonify({"error": "Session spectateur introuvable"}), 404
-    data = request.get_json(silent=True) or {}
-    sess["answers"][viewer_id] = data.get("answer")
-    return jsonify({"ok": True})
-
-@app.get("/api/camera/<channel_id>/answer/<viewer_id>")
-def camera_get_answer(channel_id, viewer_id):
-    sess = camera_session(channel_id)
-    if not sess:
-        return jsonify({"answer": None})
-    return jsonify({"answer": sess.get("answers", {}).get(viewer_id)})
-
 DB_FILE = os.path.join(BASE_DIR, "channels_db.json")
 os.makedirs(app.config["STORAGE_FOLDER"], exist_ok=True)
 
@@ -184,13 +128,27 @@ def calc_end_time(start, duration):
     return time_from_minutes(minutes_from_time(start) + (duration + 59) // 60)
 
 def youtube_id(url):
-    patterns = [
-        r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/|youtube\.com/embed/)([A-Za-z0-9_-]{11})"
-    ]
-    for pattern in patterns:
-        m = re.search(pattern, url)
-        if m:
-            return m.group(1)
+    try:
+        raw = str(url or '').strip()
+        if not raw:
+            return None
+        u = __import__('urllib.parse', fromlist=['urlparse']).urlparse(raw)
+        host = (u.hostname or '').lower().removeprefix('www.')
+        if host == 'youtu.be':
+            value = u.path.strip('/').split('/')[0] if u.path else ''
+            return value if re.fullmatch(r'[A-Za-z0-9_-]{11}', value or '') else None
+        if host in ('youtube.com', 'm.youtube.com', 'youtube-nocookie.com'):
+            if u.query:
+                from urllib.parse import parse_qs
+                value = (parse_qs(u.query).get('v') or [''])[0]
+                if re.fullmatch(r'[A-Za-z0-9_-]{11}', value):
+                    return value
+            parts = [x for x in u.path.split('/') if x]
+            if len(parts) >= 2 and parts[0].lower() in ('shorts', 'embed', 'live', 'v'):
+                value = parts[1]
+                return value if re.fullmatch(r'[A-Za-z0-9_-]{11}', value) else None
+    except Exception:
+        pass
     return None
 
 def source_info(url):
@@ -198,7 +156,7 @@ def source_info(url):
         return "video", url
     yt = youtube_id(url)
     if yt:
-        return "youtube", f"https://www.youtube.com/embed/{yt}?autoplay=1&rel=0"
+        return "youtube", f"https://www.youtube.com/embed/{yt}?enablejsapi=1&playsinline=1&rel=0"
     low = url.lower().split("?")[0]
     if low.endswith(".m3u8"):
         return "hls", url
@@ -350,6 +308,55 @@ def bad_request(_):
         return jsonify({"error": "Requête invalide ou données incomplètes"}), 400
     return "Requête invalide", 400
 
+@app.route("/api/analytics/event", methods=["POST"])
+def analytics_event():
+    data = request.get_json(silent=True) or {}
+    event_type = str(data.get("event_type", "view")).strip().lower()
+    if event_type not in {"view", "play", "heartbeat"}:
+        return jsonify({"error": "Type d'événement invalide"}), 400
+    channel_id = str(data.get("channel_id", "")).strip()[:128] or None
+    program_id = str(data.get("program_id", "")).strip()[:128] or None
+    program_title = str(data.get("program_title", "")).strip()[:255] or None
+    visitor_id = str(data.get("visitor_id", "")).strip()[:128] or None
+    try:
+        db.session.add(AnalyticsEvent(event_type=event_type, channel_id=channel_id, program_id=program_id, program_title=program_title, visitor_id=visitor_id))
+        db.session.commit()
+        return jsonify({"status": "ok"})
+    except Exception:
+        db.session.rollback()
+        return jsonify({"error": "Statistique non enregistrée"}), 500
+
+@app.route("/api/analytics/stats")
+@admin_required
+def analytics_stats():
+    now = datetime.now(timezone.utc)
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = day_start - timedelta(days=6)
+    month_start = day_start - timedelta(days=29)
+    q = AnalyticsEvent.query
+    if session.get("channel_admin_id") and not is_global_admin():
+        q = q.filter_by(channel_id=session.get("channel_admin_id"))
+    total_views = q.filter(AnalyticsEvent.event_type == "view").count()
+    total_plays = q.filter(AnalyticsEvent.event_type == "play").count()
+    today_views = q.filter(AnalyticsEvent.event_type == "view", AnalyticsEvent.created_at >= day_start).count()
+    week_views = q.filter(AnalyticsEvent.event_type == "view", AnalyticsEvent.created_at >= week_start).count()
+    month_views = q.filter(AnalyticsEvent.event_type == "view", AnalyticsEvent.created_at >= month_start).count()
+    unique = q.filter(AnalyticsEvent.event_type.in_(["view", "play"]), AnalyticsEvent.visitor_id.isnot(None)).with_entities(func.count(func.distinct(AnalyticsEvent.visitor_id))).scalar() or 0
+    online_cutoff = now - timedelta(seconds=75)
+    online = q.filter(AnalyticsEvent.event_type == "heartbeat", AnalyticsEvent.created_at >= online_cutoff, AnalyticsEvent.visitor_id.isnot(None)).with_entities(func.count(func.distinct(AnalyticsEvent.visitor_id))).scalar() or 0
+    channel_rows = q.filter(AnalyticsEvent.event_type == "view", AnalyticsEvent.channel_id.isnot(None)).with_entities(AnalyticsEvent.channel_id, func.count(AnalyticsEvent.id).label("views")).group_by(AnalyticsEvent.channel_id).order_by(func.count(AnalyticsEvent.id).desc()).all()
+    channels = {c.get("id"): c for c in load_channels()}
+    by_channel = [{"channel_id": cid, "name": channels.get(cid, {}).get("name", cid), "views": views} for cid, views in channel_rows]
+    program_rows = q.filter(AnalyticsEvent.event_type == "play", AnalyticsEvent.program_id.isnot(None)).with_entities(AnalyticsEvent.program_id, AnalyticsEvent.program_title, func.count(AnalyticsEvent.id).label("plays")).group_by(AnalyticsEvent.program_id, AnalyticsEvent.program_title).order_by(func.count(AnalyticsEvent.id).desc()).limit(20).all()
+    by_program = [{"program_id": pid, "title": title or "Programme", "plays": plays} for pid, title, plays in program_rows]
+    daily = []
+    for offset in range(6, -1, -1):
+        start = day_start - timedelta(days=offset)
+        end = start + timedelta(days=1)
+        count = q.filter(AnalyticsEvent.event_type == "view", AnalyticsEvent.created_at >= start, AnalyticsEvent.created_at < end).count()
+        daily.append({"date": start.strftime("%d/%m"), "views": count})
+    return jsonify({"total_views": total_views, "total_plays": total_plays, "today_views": today_views, "week_views": week_views, "month_views": month_views, "unique_viewers": unique, "online_now": online, "by_channel": by_channel, "by_program": by_program, "daily": daily})
+
 @app.route("/robot")
 def robot_page():
     return render_template("robot.html")
@@ -366,7 +373,14 @@ def create_channel_for_robot(name, password, number="", logo_text="", slogan="",
     new_id = f"channel-{base}-{uuid.uuid4().hex[:6]}"
     new_channel = {"id": new_id, "name": name, "number": number or f"CH {len(channels)+1:02d}", "logoText": logo_text or name[:2].upper(), "slogan": slogan or "Télévision en Continu 24/7", "genre": genre or "Généraliste", "tickerActive": True, "tickerText": f"BIENVENUE SUR {name.upper()} — DIRECT 24H/24", "schedule": []}
     channels.append(new_channel); save_channels(channels)
-    db.session.add(ChannelAccount(channel_id=new_id, password_hash=generate_password_hash(password))); db.session.commit()
+    try:
+        db.session.add(ChannelAccount(channel_id=new_id, password_hash=generate_password_hash(password)))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        # Évite de laisser une chaîne sans compte admin si la base échoue.
+        save_channels([c for c in channels if c.get("id") != new_id])
+        raise ValueError("Impossible de créer le compte administrateur de la chaîne.")
     base_url = request.host_url.rstrip("/")
     return new_channel, f"{base_url}/channel/{new_id}/admin", f"{base_url}/live/{new_id}/playlist.m3u", f"{base_url}/live/{new_id}/stream.m3u8"
 
@@ -379,9 +393,9 @@ def robot_api():
     if not message:
         return jsonify({"reply": "Écris par exemple : créer une chaîne Nom: Ma TV | Mot de passe: MonPass123"})
     # Structured one-message creation
-    m_name = re.search(r"(?:nom|chaîne|chaine)\s*[:=]\s*([^|;\n]+)", message, re.I)
+    m_name = re.search(r"(?:nom|chaîne|chaine)(?:\s+nom)?\s*[:=]\s*([^|;\n]+)", message, re.I)
     m_pass = re.search(r"(?:mot de passe|password|mdp)\s*[:=]\s*([^|;\n]+)", message, re.I)
-    if ("créer" in lower or "creer" in lower) and m_name and m_pass:
+    if any(x in lower for x in ("créer", "creer")) and m_name and m_pass:
         try:
             ch, admin_url, m3u_url, hls_url = create_channel_for_robot(m_name.group(1).strip(), m_pass.group(1).strip())
             session.pop("robot_create", None)
@@ -850,7 +864,7 @@ def get_channel_m3u(channel_id):
             continue
         if not str(url).startswith(("http://", "https://")):
             url = base + str(url)
-        lines.append(f'#EXTINF:-1 tvg-id="{ch["id"]}" tvg-name="{ch["name"]}" group-title="VISION+ TV",{p.get("title", ch["name"])}')
+        lines.append(f'#EXTINF:-1 tvg-id="{ch["id"]}" tvg-name="{ch["name"]}" group-title="DTN TV",{p.get("title", ch["name"])}')
         lines.append(url)
     if len(lines) == 1:
         lines.extend([f'#EXTINF:-1 tvg-id="{ch["id"]}" tvg-name="{ch["name"]}",{ch["name"]}', f'{base}/live/{channel_id}/stream.m3u8'])
@@ -870,7 +884,7 @@ def get_m3u():
             video_url = f"{request.host_url.rstrip('/')}/live/{ch['id']}/stream.m3u8"
         elif not str(video_url).startswith(("http://", "https://")):
             video_url = f"{request.host_url.rstrip('/')}{video_url}"
-        m3u += f'#EXTINF:-1 tvg-id="{ch["id"]}" tvg-name="{ch["name"]}" group-title="VISION+ TV",Canal {ch["number"]} - {ch["name"]}\n{video_url}\n'
+        m3u += f'#EXTINF:-1 tvg-id="{ch["id"]}" tvg-name="{ch["name"]}" group-title="DTN TV",Canal {ch["number"]} - {ch["name"]}\n{video_url}\n'
     return Response(m3u, mimetype="application/x-mpegurl")
 
 @app.route("/live/<channel_id>/stream.m3u8")
