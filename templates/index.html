@@ -14,10 +14,7 @@
       #player-container { aspect-ratio: 9 / 16; max-height: 82vh; border-radius: 1.5rem; }
       #tv-video, #tv-iframe { object-fit: cover; }
     }
-  
-      @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-35%); } }
-      button { border-radius: 1rem !important; }
-    </style>
+  </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col font-sans antialiased">
   
@@ -31,7 +28,7 @@
         <div>
           <div class="flex items-center gap-2">
             <h1 class="font-extrabold text-sm sm:text-base text-slate-900">
-              Canal {{ current_channel.number if current_channel else '01' }} — {{ current_channel.name if current_channel else 'DTN TV DIRECT' }}
+              Canal {{ current_channel.number if current_channel else '01' }} — {{ current_channel.name if current_channel else 'DTN DIRECT' }}
             </h1>
             <span class="bg-red-50 text-red-600 border border-red-200 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full">4K UHD</span>
           </div>
@@ -87,13 +84,11 @@
             src="{{ current_channel.schedule[0].videoUrl if current_channel and current_channel.schedule and current_channel.schedule[0].videoUrl else '' }}"
           ></video>
           <iframe id="tv-iframe" class="hidden w-full h-full border-0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="Lecteur Web"></iframe>
-          <video id="public-camera-video" autoplay playsinline class="hidden absolute inset-0 w-full h-full object-cover z-10"></video>
-          <div id="public-camera-badge" class="hidden absolute top-3.5 left-4 z-30 bg-red-600 text-white px-3 py-1.5 rounded-2xl text-[10px] font-black shadow-lg">🔴 DIRECT CAMÉRA</div>
 
           <!-- Filigrane Canal Haut Droite -->
           <div class="absolute top-3.5 right-4 z-20 flex items-center gap-2 bg-black/70 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-white/15 pointer-events-none text-right">
             <div class="text-right">
-              <span class="font-bold text-white text-xs block leading-none">{{ current_channel.name if current_channel else 'DTN TV' }}</span>
+              <span class="font-bold text-white text-xs block leading-none">{{ current_channel.name if current_channel else 'DTN' }}</span>
               <span class="text-[9px] text-red-400 font-mono font-bold">DIRECT 4K</span>
             </div>
             <div class="w-6 h-6 rounded-lg bg-red-600 flex items-center justify-center font-black text-white text-[10px]">
@@ -104,7 +99,7 @@
           <!-- Sous-Titres (Closed Captions Overlay) -->
           <div id="cc-overlay" class="absolute bottom-16 inset-x-4 z-20 flex justify-center pointer-events-none hidden">
             <div id="cc-text" class="bg-black/85 text-yellow-300 font-bold text-xs sm:text-sm px-4 py-1.5 rounded-lg border border-black/40 text-center shadow-2xl max-w-xl">
-              [Direct TV 4K] • DTN TV Diffusion en Haute Définition
+              [Direct TV 4K] • DTN Diffusion en Haute Définition
             </div>
           </div>
 
@@ -162,19 +157,6 @@
             </div>
           </div>
 
-        </div>
-      </div>
-
-      <!-- Bande d'informations TV -->
-      <div class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 text-white shadow-lg">
-        <div class="flex items-center gap-3 px-4 py-2 text-[11px] font-bold">
-          <span class="shrink-0 rounded-xl bg-red-600 px-2 py-1">INFO</span>
-          <div class="overflow-hidden whitespace-nowrap flex-1">
-            <div id="info-ticker" class="inline-block min-w-full animate-[marquee_18s_linear_infinite]">
-              📺 {{ current_channel.name if current_channel else 'DTN TV' }} • DIRECT • Programmes en cours • Retrouvez votre chaîne en ligne
-            </div>
-          </div>
-          <span id="ticker-clock" class="shrink-0 font-mono text-slate-300">--:--</span>
         </div>
       </div>
 
@@ -269,80 +251,29 @@
     const channelsData = {{ channels | tojson | safe }};
     const channelId = {{ (current_channel.id if current_channel else '') | tojson }};
     let currentChannel = channelsData.find(c => c.id === channelId) || channelsData[0] || null;
+    const analyticsVisitorId = (() => {
+      const key='dtn_tv_visitor_id';
+      let v=localStorage.getItem(key);
+      if(!v){v=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(16).slice(2));localStorage.setItem(key,v);}
+      return v;
+    })();
+    async function trackAnalytics(event_type, p=null){
+      try { await fetch('/api/analytics/event',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event_type,channel_id:currentChannel?.id||channelId,program_id:p?.id||null,program_title:p?.title||null,visitor_id:analyticsVisitorId})}); } catch(e) {}
+    }
+    trackAnalytics('view');
+    setInterval(()=>trackAnalytics('heartbeat'),20000);
     let currentProgram = null;
     let currentProgramIndex = -1;
     let hls = null;
     let ytPlayer = null;
     let ccActive = false;
     let lastProgramId = null;
-    const publicCameraVideo = document.getElementById('public-camera-video');
-    const publicCameraBadge = document.getElementById('public-camera-badge');
-    let publicCameraPc = null;
-    let publicCameraViewerId = null;
-    let publicCameraActive = false;
 
     function fmt(s) {
       if (!Number.isFinite(s)) return '00:00';
       const m = Math.floor(s / 60).toString().padStart(2, '0');
       const sec = Math.floor(s % 60).toString().padStart(2, '0');
       return m + ':' + sec;
-    }
-
-    function waitForIceGatheringPublic(pc) {
-      if (pc.iceGatheringState === 'complete') return Promise.resolve();
-      return new Promise(resolve => {
-        const done = () => { if (pc.iceGatheringState === 'complete') { pc.removeEventListener('icegatheringstatechange', done); resolve(); } };
-        pc.addEventListener('icegatheringstatechange', done);
-        setTimeout(resolve, 5000);
-      });
-    }
-
-    async function stopPublicCamera() {
-      publicCameraActive = false;
-      if (publicCameraPc) { try { publicCameraPc.close(); } catch(e) {} publicCameraPc = null; }
-      publicCameraVideo.srcObject = null;
-      publicCameraVideo.classList.add('hidden');
-      publicCameraBadge.classList.add('hidden');
-    }
-
-    async function startPublicCamera() {
-      if (publicCameraActive || !channelId) return;
-      publicCameraActive = true;
-      try {
-        const status = await fetch(`/api/camera/${encodeURIComponent(channelId)}/status`, {cache:'no-store'});
-        const st = await status.json();
-        if (!st.active) { await stopPublicCamera(); return; }
-        publicCameraPc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-        publicCameraPc.ontrack = e => {
-          if (e.streams[0]) { publicCameraVideo.srcObject = e.streams[0]; publicCameraVideo.classList.remove('hidden'); publicCameraBadge.classList.remove('hidden'); }
-        };
-        publicCameraPc.onconnectionstatechange = () => {
-          if (['failed','closed'].includes(publicCameraPc?.connectionState)) stopPublicCamera();
-        };
-        const offer = await publicCameraPc.createOffer();
-        await publicCameraPc.setLocalDescription(offer);
-        await waitForIceGatheringPublic(publicCameraPc);
-        const r = await fetch(`/api/camera/${encodeURIComponent(channelId)}/offer`, {
-          method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({offer:publicCameraPc.localDescription})
-        });
-        if (!r.ok) { await stopPublicCamera(); return; }
-        const data = await r.json(); publicCameraViewerId = data.viewerId;
-        for (let i=0; i<25 && publicCameraActive; i++) {
-          await new Promise(r => setTimeout(r, 400));
-          const a = await fetch(`/api/camera/${encodeURIComponent(channelId)}/answer/${encodeURIComponent(publicCameraViewerId)}`, {cache:'no-store'});
-          const ans = await a.json();
-          if (ans.answer) { await publicCameraPc.setRemoteDescription(ans.answer); break; }
-        }
-      } catch(e) { await stopPublicCamera(); }
-    }
-
-    async function refreshPublicCamera() {
-      if (!channelId || !window.RTCPeerConnection) return;
-      try {
-        const r = await fetch(`/api/camera/${encodeURIComponent(channelId)}/status`, {cache:'no-store'});
-        const st = await r.json();
-        if (st.active) await startPublicCamera(); else if (publicCameraActive) await stopPublicCamera();
-      } catch(e) {}
     }
 
     async function refreshSchedule() {
@@ -376,14 +307,13 @@
       setText('current-time-range', `${p?.startTime || '00:00'} → ${p?.endTime || '23:59'}`);
       const days = Array.isArray(p?.day) ? p.day : ['Tous les jours'];
       setText('current-days', days.join(', '));
-      setText('cc-text', `[Direct TV] • ${p?.title || 'DTNTVDiffusion'}`);
-      setText('info-ticker', `📺 ${currentChannel?.name || 'DTN TV'} • ${p?.title || 'Antenne en direct'} • ${p?.category || 'PROGRAMME'} • Diffusion en ligne`);
+      setText('cc-text', `[Direct TV] • ${p?.title || 'DTN Diffusion'}`);
     }
 
     function destroyPlayers() {
-      if (hls) { () { hls.destroy(); } catch(e) {} hls = null; }
+      if (hls) { try { hls.destroy(); } catch(e) {} hls = null; }
       if (ytPlayer) { try { ytPlayer.destroy(); } catch(e) {} ytPlayer = null; }
-      iframe.classList.add('hidden');:
+      iframe.classList.add('hidden');
       video.classList.remove('hidden');
       video.pause();
       video.removeAttribute('src');
@@ -397,6 +327,7 @@
       currentProgram = p;
       currentProgramIndex = index;
       showProgramInfo(p);
+      trackAnalytics('play', p);
       destroyPlayers();
 
       const type = p.playbackType || detectType(p.videoUrl);
@@ -405,9 +336,21 @@
       if (type === 'youtube') {
         video.classList.add('hidden');
         iframe.classList.remove('hidden');
-        const src = url.includes('enablejsapi=1') ? url : url + (url.includes('?') ? '&' : '?') + 'enablejsapi=1';
-        iframe.src = src;
-        setTimeout(initYoutubePlayer, 500);
+
+        // YouTube ne doit pas être envoyé directement comme URL youtu.be dans l'iframe.
+        // On extrait l'ID puis on construit l'URL officielle /embed/VIDEO_ID.
+        const videoId = extractYouTubeId(url);
+        if (!videoId) {
+          iframe.src = '';
+          iframe.classList.add('hidden');
+          video.classList.remove('hidden');
+          setText('current-title', 'Lien YouTube invalide');
+          return;
+        }
+        const origin = window.location.origin;
+        iframe.src = 'https://www.youtube.com/embed/' + encodeURIComponent(videoId)
+          + '?enablejsapi=1&playsinline=1&rel=0&origin=' + encodeURIComponent(origin);
+        setTimeout(initYoutubePlayer, 700);
       } else if (type === 'web') {
         // Les pages web externes peuvent refuser l'intégration (X-Frame-Options/CSP).
         // Dans ce cas, le navigateur affichera le refus de la page plutôt qu'une fausse promesse de lecture.
@@ -428,8 +371,35 @@
       }
     }
 
+    function extractYouTubeId(value) {
+      try {
+        const raw = String(value || '').trim();
+        if (!raw) return null;
+        const u = new URL(raw);
+        const host = u.hostname.replace(/^www\./i, '').toLowerCase();
+
+        // https://youtu.be/MklIPeDzU7g?feature=shared
+        if (host === 'youtu.be') {
+          const id = u.pathname.split('/').filter(Boolean)[0];
+          return id || null;
+        }
+
+        if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'youtube-nocookie.com') {
+          // https://www.youtube.com/watch?v=VIDEO_ID
+          const v = u.searchParams.get('v');
+          if (v) return v;
+
+          // /shorts/VIDEO_ID, /embed/VIDEO_ID, /live/VIDEO_ID
+          const parts = u.pathname.split('/').filter(Boolean);
+          const marker = parts[0]?.toLowerCase();
+          if (['shorts', 'embed', 'live', 'v'].includes(marker)) return parts[1] || null;
+        }
+      } catch (e) {}
+      return null;
+    }
+
     function detectType(url) {
-      if (/youtu\.be\/|youtube\.com\/(watch|shorts|embed)/i.test(url)) return 'youtube';
+      if (extractYouTubeId(url)) return 'youtube';
       if (/\.m3u8(\?|$)/i.test(url)) return 'hls';
       return 'video';
     }
@@ -447,7 +417,9 @@
       };
       const toMin = t => { const m=String(t||'00:00').match(/^(\d{1,2}):(\d{2})/); return m ? (+m[1]*60 + +m[2]) : 0; };
       const candidates = list.map((p,i)=>({p,i,start:toMin(p.startTime)}))
-        .filter(x => x.p && x.p.autoNext !== false && dayMatch(x.p));() minsNow;
+        .filter(x => x.p && x.p.autoNext !== false && dayMatch(x.p));
+      candidates.sort((a,b)=>a.start-b.start);
+      const currentStart = currentProgram ? toMin(currentProgram.startTime) : minsNow;
       let next = candidates.find(x => x.start > currentStart);
       if (!next) next = candidates.find(x => x.start >= minsNow) || candidates[0];
       if (next) loadProgram(next.p, next.i);
@@ -460,8 +432,16 @@
       if (iframe.classList.contains('hidden') || !iframe.src || !window.YT?.Player || ytPlayer) return;
       ytPlayer = new YT.Player('tv-iframe', {
         events: {
+          onReady: () => {
+            centerPlayBtn.classList.remove('hidden');
+          },
           onStateChange: e => {
             if (e.data === YT.PlayerState.ENDED) advanceProgram();
+          },
+          onError: e => {
+            const messages = {100:'Vidéo YouTube introuvable ou privée.',101:'Cette vidéo n’autorise pas la lecture intégrée.',150:'Cette vidéo n’autorise pas la lecture intégrée.',153:'YouTube ne peut pas identifier correctement le site.'};
+            setText('current-title', messages[e.data] || 'Erreur du lecteur YouTube.');
+            centerPlayBtn.classList.add('hidden');
           }
         }
       });

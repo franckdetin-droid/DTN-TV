@@ -3,17 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Régie & Administration TV — DTN TV 24/7</title>
-  <script>window.DTN TV = {{ (channel_mode or false) | tojson }}; window.VISION_CHANNEL_ID = {{ (channel_id or "") | tojson }};</script>
+  <title>Régie & Administration TV — DTN 24/7</title>
+  <script>window.VISION_CHANNEL_MODE = {{ (channel_mode or false) | tojson }}; window.VISION_CHANNEL_ID = {{ (channel_id or "") | tojson }};</script>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @media (max-width: 640px) {
       #studio-camera-stage { aspect-ratio: 9 / 16; min-height: 0; max-height: 78vh; }
       #studio-camera-video { object-fit: cover; }
     }
-  
-      button, .rounded-xl, .rounded-2xl, .rounded-3xl { border-radius: 1rem; }
-    </style>
+  </style>
   <style>
     .tab-btn.active {
       background-color: #dc2626;
@@ -139,6 +137,10 @@
       <button onclick="switchTab('storage')" id="tab-btn-storage" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0 transition cursor-pointer">
         <span>💾</span> <span>Stockage 2 To</span>
       </button>
+      <button onclick="switchTab('stats')" id="tab-btn-stats" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0 transition cursor-pointer">
+        <span>📊</span> <span>Statistiques</span>
+      </button>
+
     </div>
   </div>
 
@@ -166,7 +168,7 @@
           <form onsubmit="handleCreateChannel(event)" class="space-y-3">
             <div>
               <label class="text-xs font-bold text-slate-700 block mb-1">Nom de la Chaîne</label>
-              <input type="text" id="new-ch-name" required placeholder="Ex: VISION+ SPORT" class="w-full bg-slate-50 border border-slate-300 focus:border-red-600 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 outline-none" />
+              <input type="text" id="new-ch-name" required placeholder="Ex: DTN SPORT" class="w-full bg-slate-50 border border-slate-300 focus:border-red-600 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 outline-none" />
             </div>
 
             <div class="grid grid-cols-2 gap-2">
@@ -488,6 +490,38 @@
       </div>
     </section>
 
+
+    <!-- ONGLET 7 : STATISTIQUES -->
+    <section id="tab-content-stats" class="space-y-6 hidden">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-black text-slate-900 flex items-center gap-2">📊 Statistiques DTN TV</h2>
+          <p class="text-xs text-slate-500">Vues, lectures, visiteurs uniques et activité récente.</p>
+        </div>
+        <button onclick="loadAnalyticsStats()" class="bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-xl">↻ Actualiser</button>
+      </div>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="bg-white border border-slate-200 rounded-2xl p-4"><span class="text-[11px] text-slate-500 font-bold">Vues aujourd'hui</span><div id="stat-today" class="text-2xl font-black text-red-600 mt-1">0</div></div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-4"><span class="text-[11px] text-slate-500 font-bold">Vues 7 jours</span><div id="stat-week" class="text-2xl font-black text-slate-900 mt-1">0</div></div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-4"><span class="text-[11px] text-slate-500 font-bold">Visiteurs uniques</span><div id="stat-unique" class="text-2xl font-black text-slate-900 mt-1">0</div></div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-4"><span class="text-[11px] text-slate-500 font-bold">En ligne</span><div id="stat-online" class="text-2xl font-black text-emerald-600 mt-1">0</div></div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs">
+          <h3 class="text-sm font-black mb-4">📈 Vues des 7 derniers jours</h3>
+          <div id="stats-daily" class="space-y-2"></div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs">
+          <h3 class="text-sm font-black mb-4">📺 Chaînes les plus regardées</h3>
+          <div id="stats-channels" class="space-y-2"></div>
+        </div>
+      </div>
+      <div class="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs">
+        <h3 class="text-sm font-black mb-4">🎬 Programmes les plus lancés</h3>
+        <div id="stats-programs" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"></div>
+      </div>
+    </section>
+
     <!-- ONGLET 6 : STOCKAGE PERSONNEL -->
     <section id="tab-content-storage" class="space-y-6 hidden">
       <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-6">
@@ -539,8 +573,6 @@
     let currentFluxFormat = 'm3u8';
     let cameraStream = null;
     let isCameraOnAir = false;
-    const cameraPeerConnections = new Map();
-    let cameraOfferPoll = null;
     const CSRF_TOKEN = "{{ csrf_token }}";
     const nativeFetch = window.fetch.bind(window);
     async function apiFetch(url, options = {}) {
@@ -565,6 +597,7 @@
       renderScheduleList();
       generateFluxUrl();
       fetchStorageStatus();
+      loadAnalyticsStats();
       if (window.VISION_CHANNEL_MODE) {
         document.querySelectorAll('[onclick^=\"deleteChannel\"]').forEach(x => x.classList.add('hidden'));
         const createForms = document.querySelectorAll('form');
@@ -630,7 +663,7 @@
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.getElementById('tab-btn-' + tabId).classList.add('active');
       
-      ['channels', 'upload', 'schedule', 'flux', 'camera', 'storage'].forEach(id => {
+      ['channels', 'upload', 'schedule', 'flux', 'camera', 'storage', 'stats'].forEach(id => {
         const sec = document.getElementById('tab-content-' + id);
         if (sec) {
           if (id === tabId) sec.classList.remove('hidden'); else sec.classList.add('hidden');
@@ -981,7 +1014,7 @@
       }
     }
 
-    async function toggleCameraOnAir() {
+    function toggleCameraOnAir() {
       if (!cameraStream) {
         alert("Veuillez d'abord allumer la caméra.");
         return;
@@ -989,70 +1022,17 @@
       isCameraOnAir = !isCameraOnAir;
       const badge = document.getElementById('camera-onair-badge');
       const btn = document.getElementById('btn-toggle-onair');
-      const channelId = document.getElementById('prog-channel-select')?.value;
-      if (!channelId) { isCameraOnAir = false; alert("Sélectionnez une chaîne."); return; }
       if (isCameraOnAir) {
-        try {
-          await apiFetch(`/api/camera/${encodeURIComponent(channelId)}/register`, { method: 'POST' });
-          badge.classList.remove('hidden');
-          btn.innerText = "⏹ Couper l'Antenne Direct";
-          btn.classList.add('bg-red-600');
-          startCameraBroadcastSignaling(channelId);
-          showToast("🔴 Caméra Studio ON AIR : les spectateurs peuvent la voir.");
-        } catch (e) {
-          isCameraOnAir = false;
-          alert("Impossible de passer la caméra à l'antenne.");
-        }
+        badge.classList.remove('hidden');
+        btn.innerText = "⏹ Couper l'Antenne Direct";
+        btn.classList.add('bg-red-600');
+        showToast("🔴 Caméra Studio ON AIR sur la chaîne !");
       } else {
-        stopCameraBroadcastSignaling();
-        try { await apiFetch(`/api/camera/${encodeURIComponent(channelId)}/stop`, { method: 'POST' }); } catch(e) {}
         badge.classList.add('hidden');
         btn.innerText = "🔴 Passer la Caméra à l'Antenne";
         btn.classList.remove('bg-red-600');
         showToast("Antenne caméra coupée.");
       }
-    }
-
-    function waitForIceGathering(pc) {
-      if (pc.iceGatheringState === 'complete') return Promise.resolve();
-      return new Promise(resolve => {
-        const done = () => { if (pc.iceGatheringState === 'complete') { pc.removeEventListener('icegatheringstatechange', done); resolve(); } };
-        pc.addEventListener('icegatheringstatechange', done);
-        setTimeout(resolve, 5000);
-      });
-    }
-
-    async function startCameraBroadcastSignaling(channelId) {
-      stopCameraBroadcastSignaling();
-      cameraOfferPoll = setInterval(async () => {
-        try {
-          const r = await apiFetch(`/api/camera/${encodeURIComponent(channelId)}/offers`, { cache: 'no-store' });
-          if (!r.ok) return;
-          const data = await r.json();
-          for (const item of (data.offers || [])) {
-            if (cameraPeerConnections.has(item.viewerId)) continue;
-            const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-            cameraPeerConnections.set(item.viewerId, pc);
-            if (cameraStream) cameraStream.getTracks().forEach(track => pc.addTrack(track, cameraStream));
-            await pc.setRemoteDescription(item.offer);
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            await waitForIceGathering(pc);
-            await apiFetch(`/api/camera/${encodeURIComponent(channelId)}/answer/${encodeURIComponent(item.viewerId)}`, {
-              method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({answer: pc.localDescription})
-            });
-            pc.onconnectionstatechange = () => {
-              if (['failed','closed','disconnected'].includes(pc.connectionState)) { pc.close(); cameraPeerConnections.delete(item.viewerId); }
-            };
-          }
-        } catch (e) {}
-      }, 800);
-    }
-
-    function stopCameraBroadcastSignaling() {
-      if (cameraOfferPoll) { clearInterval(cameraOfferPoll); cameraOfferPoll = null; }
-      cameraPeerConnections.forEach(pc => { try { pc.close(); } catch(e) {} });
-      cameraPeerConnections.clear();
     }
 
     function applyCameraFilter(type) {
@@ -1062,6 +1042,29 @@
       else if (type === 'golden') video.style.filter = 'sepia(0.25) saturate(1.45) brightness(1.06)';
       else if (type === 'bw') video.style.filter = 'grayscale(100%) contrast(1.2)';
       showToast("Filtre appliqué au retour studio.");
+    }
+
+
+    async function loadAnalyticsStats() {
+      const box = document.getElementById('stats-daily');
+      if (!box) return;
+      try {
+        const res = await apiFetch('/api/analytics/stats', {cache:'no-store'});
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Statistiques indisponibles');
+        document.getElementById('stat-today').innerText = d.today_views || 0;
+        document.getElementById('stat-week').innerText = d.week_views || 0;
+        document.getElementById('stat-unique').innerText = d.unique_viewers || 0;
+        document.getElementById('stat-online').innerText = d.online_now || 0;
+        const max = Math.max(1, ...(d.daily||[]).map(x=>x.views));
+        box.innerHTML = (d.daily||[]).map(x=>`<div class="flex items-center gap-2 text-xs"><span class="w-10 font-mono text-slate-500">${x.date}</span><div class="flex-1 h-3 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-red-600 rounded-full" style="width:${Math.max(2,(x.views/max)*100)}%"></div></div><b class="w-10 text-right">${x.views}</b></div>`).join('');
+        const chBox=document.getElementById('stats-channels');
+        chBox.innerHTML=(d.by_channel||[]).length ? d.by_channel.map(x=>`<div class="flex justify-between gap-3 p-2.5 bg-slate-50 rounded-xl text-xs"><span class="font-bold truncate">${escapeHtml(x.name)}</span><b>${x.views}</b></div>`).join('') : '<div class="text-xs text-slate-500">Aucune vue enregistrée.</div>';
+        const pBox=document.getElementById('stats-programs');
+        pBox.innerHTML=(d.by_program||[]).length ? d.by_program.map(x=>`<div class="p-3 bg-slate-50 rounded-xl border border-slate-200"><div class="font-bold text-xs truncate">${escapeHtml(x.title)}</div><div class="text-[11px] text-slate-500 mt-1">${x.plays} lecture(s)</div></div>`).join('') : '<div class="text-xs text-slate-500">Aucune lecture enregistrée.</div>';
+      } catch(e) {
+        box.innerHTML = `<div class="text-xs text-red-600">${escapeHtml(e.message)}</div>`;
+      }
     }
 
     // STOCKAGE PERSONNEL

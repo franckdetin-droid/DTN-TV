@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Robot VISION+ TV</title>
+  <title>Robot DTN TV</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="min-h-screen bg-slate-50 text-slate-900">
   <main class="max-w-2xl mx-auto px-4 py-8">
     <div class="bg-white border border-slate-200 rounded-3xl shadow-xl overflow-hidden">
       <div class="bg-slate-900 text-white p-6">
-        <div class="text-xs font-bold tracking-widest text-red-400">VISION+ TV</div>
+        <div class="text-xs font-bold tracking-widest text-red-400">DTN TV</div>
         <h1 class="text-2xl font-black mt-1">🤖 Robot de création de chaîne</h1>
         <p class="text-sm text-slate-300 mt-2">Le robot prépare automatiquement votre chaîne et votre espace d'administration.</p>
       </div>
@@ -26,7 +26,7 @@
 const chat=document.getElementById('chat');
 function add(text,me=false){const d=document.createElement('div');d.className=me?'ml-auto max-w-[90%] bg-red-600 text-white rounded-2xl rounded-br-md p-3 text-sm':'max-w-[95%] bg-slate-100 rounded-2xl rounded-bl-md p-3 text-sm';d.innerHTML=text;chat.appendChild(d);chat.scrollTop=chat.scrollHeight;}
 add('Bonjour. 🤖 Je peux créer une chaîne, son espace administrateur et ses liens de diffusion. Commence par écrire <b>créer une chaîne</b>.');
-document.getElementById('form').addEventListener('submit',async e=>{e.preventDefault();const input=document.getElementById('message');const message=input.value.trim();if(!message)return;add(message.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])),true);input.value='';try{const r=await fetch('/api/robot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});const d=await r.json();let html=d.reply||'Une erreur est survenue.';if(d.admin_url){html+=`<br><br>🔐 <b>Administration :</b> <a class="text-red-600 underline" href="${d.admin_url}">${d.admin_url}</a><br>📺 <b>Flux M3U pour VLC :</b> <a class="text-red-600 underline break-all" href="${d.m3u_url}">${d.m3u_url}</a><br>🎬 <b>Adresse HLS :</b> <span class="break-all">${d.hls_url}</span><br><br><span class="text-xs">Le mot de passe est celui que vous avez choisi. Gardez-le en lieu sûr.</span>`;}add(html)}catch(err){add('Impossible de contacter le robot pour le moment.');}});
+document.getElementById('form').addEventListener('submit',async e=>{e.preventDefault();const input=document.getElementById('message');const message=input.value.trim();if(!message)return;add(message.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])),true);input.value='';try{const r=await fetch('/api/robot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});const d=await r.json();let html=d.reply||'Une erreur est survenue.';if(d.admin_url){html+=`<br><br>🔐 <b>Administration :</b> <a class="text-red-600 underline" href="${d.admin_url}">${d.admin_url}</a><br>📺 <b>Flux M3U pour VLC :</b> <a class="text-red-600 underline break-all" href="${d.m3u_url}">${d.m3u_url}</a><br>🎬 <b>Adresse HLS :</b> <span class="break-all">${d.hls_url}</span><br><span class="text-[10px] text-slate-500">Le flux HLS fonctionne lorsqu’un programme HLS (.m3u8) est actuellement à l’antenne. Pour MP4/YouTube, utilisez la page TV ou la playlist M3U.</span><br><br><span class="text-xs">Le mot de passe est celui que vous avez choisi. Gardez-le en lieu sûr.</span>`;}add(html)}catch(err){add('Impossible de contacter le robot pour le moment.');}});
 </script>
 </body>
 </html>
