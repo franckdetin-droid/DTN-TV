@@ -18,6 +18,26 @@
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col font-sans antialiased">
   
+  <div class="ecran">
+
+    <video
+        id="lecteur"
+        controls
+        autoplay
+        playsinline
+        preload="metadata"
+    >
+        Votre navigateur ne peut pas lire cette vidéo.
+    </video>
+
+    <div id="sousTitre"></div>
+
+    <div id="info">
+        Aucune chaîne sélectionnée
+    </div>
+
+</div>
+
   <!-- En-tête Blanc Lumineux -->
   <header class="bg-white border-b border-slate-200 sticky top-0 z-30 px-4 sm:px-6 py-3 shadow-xs">
     <div class="max-w-7xl mx-auto flex items-center justify-between">
@@ -42,12 +62,10 @@
         <span class="text-[11px] font-black uppercase tracking-wider text-red-600 flex items-center gap-1.5 bg-red-50 border border-red-200 px-3 py-1 rounded-full">
           <span class="w-2 h-2 rounded-full bg-red-600 animate-ping"></span> DIRECT 24/7
         </span>
-        <!-- Accès Régie retiré de l'interface publique. -->
       </div>
     </div>
   </header>
-
-  <!-- Contenu Principal -->
+    <!-- Contenu Principal -->
   <main class="max-w-7xl mx-auto p-4 sm:p-6 space-y-4 flex-1 w-full">
     
     <!-- Barre de Changement Rapide de Chaînes TV en 1 Clic -->
@@ -231,9 +249,8 @@
       </div>
     </div>
 
-  </main>
-
-  <script>
+            </main>
+                      <script>
     const video = document.getElementById('tv-video');
     const iframe = document.getElementById('tv-iframe');
     const container = document.getElementById('player-container');
@@ -288,12 +305,9 @@
           const index = (currentChannel.schedule || []).findIndex(x => x.id === p.id);
           loadProgram(p, index >= 0 ? index : 0);
         } else if (!p && data.next && lastProgramId) {
-          // Pas de programme actif : attendre le prochain créneau.
           lastProgramId = null;
         }
-      } catch (e) {
-        // Le lecteur continue avec le programme déjà chargé si le serveur est temporairement indisponible.
-      }
+      } catch (e) {}
     }
 
     function setText(id, value) {
@@ -337,8 +351,6 @@
         video.classList.add('hidden');
         iframe.classList.remove('hidden');
 
-        // YouTube ne doit pas être envoyé directement comme URL youtu.be dans l'iframe.
-        // On extrait l'ID puis on construit l'URL officielle /embed/VIDEO_ID.
         const videoId = extractYouTubeId(url);
         if (!videoId) {
           iframe.src = '';
@@ -352,8 +364,6 @@
           + '?enablejsapi=1&playsinline=1&rel=0&origin=' + encodeURIComponent(origin);
         setTimeout(initYoutubePlayer, 700);
       } else if (type === 'web') {
-        // Les pages web externes peuvent refuser l'intégration (X-Frame-Options/CSP).
-        // Dans ce cas, le navigateur affichera le refus de la page plutôt qu'une fausse promesse de lecture.
         video.classList.add('hidden');
         iframe.classList.remove('hidden');
         iframe.src = url;
@@ -378,18 +388,15 @@
         const u = new URL(raw);
         const host = u.hostname.replace(/^www\./i, '').toLowerCase();
 
-        // https://youtu.be/MklIPeDzU7g?feature=shared
         if (host === 'youtu.be') {
           const id = u.pathname.split('/').filter(Boolean)[0];
           return id || null;
         }
 
         if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'youtube-nocookie.com') {
-          // https://www.youtube.com/watch?v=VIDEO_ID
           const v = u.searchParams.get('v');
           if (v) return v;
 
-          // /shorts/VIDEO_ID, /embed/VIDEO_ID, /live/VIDEO_ID
           const parts = u.pathname.split('/').filter(Boolean);
           const marker = parts[0]?.toLowerCase();
           if (['shorts', 'embed', 'live', 'v'].includes(marker)) return parts[1] || null;
@@ -521,11 +528,9 @@
       if(e.key==='c'){e.preventDefault();toggleSubtitles();}
     });
 
-    // Le serveur est la source de vérité pour le programme à l'antenne.
-    // Le contrôle est vérifié régulièrement pour changer automatiquement de programme
-    // quand l'heure de fin est atteinte ou quand un nouveau créneau commence.
     refreshSchedule();
     setInterval(refreshSchedule, 2000);
   </script>
 </body>
-</html>
+  </html>
+  
