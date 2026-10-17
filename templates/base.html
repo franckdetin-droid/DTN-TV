@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b6bcb">
+  <meta name="description" content="ProxiService vous aide à trouver des professionnels et services près de chez vous.">
+  <title>{% block title %}ProxiService — Les bons services, près de vous{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">P</span><span>ProxiService</span></a>
+  <nav>
+    <a href="{{ url_for('index') }}">Accueil</a>
+    <a href="{{ url_for('application_page') }}">Télécharger l’application</a>
+    {% if current_user %}
+      {% if current_user['role'] != 'admin' %}<a href="{{ url_for('my_services') }}">Mes services</a>{% endif %}
+      <a href="{{ url_for('inbox') }}">Messages</a>
+      <a class="nav-cta" href="{{ url_for('logout') }}">Déconnexion</a>
+    {% else %}
+      <a href="{{ url_for('login') }}">Espace professionnel</a>
+      <a class="nav-cta" href="{{ url_for('register') }}">Proposer un service</a>
+    {% endif %}
+  </nav>
+</header>
+<main>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}<div class="flash-wrap">{% for category, message in messages %}<div class="flash {{ category }}">{{ message }}</div>{% endfor %}</div>{% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+<footer class="footer"><div><strong>ProxiService</strong><span> Trouvez le bon professionnel près de vous.</span></div><small>© {{ current_year }} ProxiService · Accès public sans compte visiteur.</small></footer>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

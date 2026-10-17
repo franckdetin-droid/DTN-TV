@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ service['title'] }} — ProxiService{% endblock %}
+{% block content %}
+<div class="page-container">
+  <a class="back-link" href="{{ url_for('index') }}">← Retour aux services</a>
+  <div class="detail-layout">
+    <section class="detail-main">
+      <div class="detail-image">
+        {% if service['image'] %}<img src="{{ url_for('static', filename='uploads/' + service['image']) }}" alt="{{ service['title'] }}">{% else %}<div class="detail-placeholder">✦<span>{{ service['category'] }}</span></div>{% endif %}
+      </div>
+      <span class="eyebrow">{{ service['category'] }}</span><h1>{{ service['title'] }}</h1>
+      <p class="detail-location">⌖ {{ service['neighborhood'] + ', ' if service['neighborhood'] else '' }}{{ service['city'] }}</p>
+      <p class="detail-description">{{ service['description'] or 'Contactez le professionnel pour en savoir plus sur ce service.' }}</p>
+      <div class="detail-price">{{ service['price'] or 'Tarif à demander' }}</div>
+    </section>
+    <aside class="provider-panel">
+      <div class="provider-avatar">{{ service['provider_name'][:1]|upper }}</div><span class="eyebrow">VOTRE PROFESSIONNEL</span><h2>{{ service['provider_name'] }}</h2>
+      {% if service['provider_bio'] %}<p>{{ service['provider_bio'] }}</p>{% endif %}
+      <div class="contact-actions">
+        {% if service['whatsapp'] %}
+          {% set wa = service['whatsapp']|replace(' ','')|replace('+','')|replace('-','')|replace('(','')|replace(')','') %}
+          <a class="btn whatsapp" href="https://wa.me/{{ wa }}?text=Bonjour%2C%20je%20vous%20contacte%20depuis%20ProxiService%20au%20sujet%20de%20votre%20service%20%3A%20{{ service['title']|urlencode }}" target="_blank" rel="noopener noreferrer">◉ Discuter sur WhatsApp</a>
+        {% else %}
+          <a class="btn primary full" href="{{ url_for('message_provider', service_id=service['id']) }}">☏ Discuter sur le site</a>
+        {% endif %}
+        {% if service['phone'] %}<a class="btn outline full" href="tel:{{ service['phone'] }}">Appeler le professionnel</a>{% endif %}
+      </div>
+      <p class="privacy-note">Ne partagez jamais de code secret ni d'information bancaire dans une conversation.</p>
+    </aside>
+  </div>
+</div>
+{% endblock %}

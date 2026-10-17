@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Télécharger l’application — ProxiService{% endblock %}
+{% block content %}
+<section class="app-page">
+  <div class="app-card">
+    <div class="app-icon">P</div>
+    <span class="eyebrow">PROXISERVICE SUR MOBILE</span>
+    <h1>{{ app_label }}</h1>
+    <p class="app-lead">Retrouvez les services et les professionnels, recherchez facilement et contactez le prestataire qui vous convient.</p>
+    {% if download_url %}
+      <a class="btn primary app-download-button" href="{{ download_url }}" target="_blank" rel="noopener noreferrer"><span>⬇</span> Télécharger l’application</a>
+      <p class="app-safe-note">Le téléchargement s’ouvre sur le lien fourni par l’équipe ProxiService.</p>
+    {% else %}
+      <div class="app-not-ready"><span>⌛</span><div><b>Le téléchargement arrive bientôt</b><p>Le lien de l’application n’a pas encore été ajouté. Revenez un peu plus tard.</p></div></div>
+    {% endif %}
+    <a class="back-link" href="{{ url_for('index') }}">← Retour à l’accueil</a>
+  </div>
+  <div class="app-benefits"><div><b>01</b><span>Recherche rapide</span><p>Trouvez un service à partir d’un mot-clé, d’une ville ou d’une catégorie.</p></div><div><b>02</b><span>Contact direct</span><p>Consultez les informations et contactez le professionnel sans compte visiteur.</p></div><div><b>03</b><span>Simple à utiliser</span><p>Une interface adaptée aux téléphones et aux écrans plus larges.</p></div></div>
+</section>
+{% endblock %}

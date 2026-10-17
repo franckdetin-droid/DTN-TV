@@ -1,0 +1,2 @@
+{% extends "base.html" %}{% block title %}{{ code }} — ProxiService{% endblock %}
+{% block content %}<div class="empty-state error-page"><div class="empty-icon">{{ code }}</div><h1>{{ message }}</h1><p>La page demandée n'est pas disponible.</p><a class="btn primary" href="{{ url_for('index') }}">Retour à l'accueil</a></div>{% endblock %}

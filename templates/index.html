@@ -1,409 +1,86 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DTN TV — Lecteur Style YouTube & Direct 24/7</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-  <script src="https://www.youtube.com/iframe_api"></script>
-  <style>
-    .ecran { width: 100%; height: 100%; position: relative; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-    .ecran #lecteur { width: 100%; height: 100%; object-fit: contain; background: #000; }
-    .ecran #sousTitre { position: absolute; left: 12px; right: 12px; bottom: 42px; text-align: center; color: #fff; font-weight: 700; text-shadow: 0 1px 3px #000; pointer-events: none; }
-    .ecran #info { position: absolute; left: 12px; right: 12px; bottom: 10px; color: #fff; font-size: 12px; text-align: center; text-shadow: 0 1px 3px #000; pointer-events: none; }
-    @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
-    .animate-marquee { display: inline-block; white-space: nowrap; animation: marquee 25s linear infinite; }
-    @media (max-width: 640px) {
-      #player-container { aspect-ratio: 9 / 16; max-height: 82vh; border-radius: 1.5rem; }
-      #tv-video, #tv-iframe { object-fit: cover; }
-    }
-  </style>
-</head>
-<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col font-sans antialiased">
-  
-  <!-- En-tête Blanc Lumineux -->
-  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 px-4 sm:px-6 py-3 shadow-xs">
-    <div class="max-w-7xl mx-auto flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center font-black text-white text-base shadow-sm">
-          {{ current_channel.logoText if current_channel else 'V+' }}
-        </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <h1 class="font-extrabold text-sm sm:text-base text-slate-900">
-              Canal {{ current_channel.number if current_channel else '01' }} — {{ current_channel.name if current_channel else 'DTN TV DIRECT' }}
-            </h1>
-            <span class="bg-red-50 text-red-600 border border-red-200 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full">4K UHD</span>
-          </div>
-          <p class="text-xs text-slate-500 font-medium">
-            {{ current_channel.slogan if current_channel else 'Télévision en Continu 24/7' }}
-          </p>
-        </div>
-      </div>
+{% extends "base.html" %}
+{% block title %}ProxiService — Trouvez un service près de vous{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="hero-copy">
+    <span class="eyebrow">LE BON CONTACT, AU BON ENDROIT</span>
+    <h1>Les services dont vous avez besoin, <em>près de vous.</em></h1>
+    <p>Découvrez des professionnels locaux, comparez leurs services et contactez-les directement.</p>
+    <form class="search-panel" method="get" action="{{ url_for('index') }}">
+      <label><span>Quel service recherchez-vous ?</span><input name="q" value="{{ q }}" placeholder="Plombier, coiffure, réparation…" /></label>
+      <label><span>Ville ou quartier</span><input name="city" value="{{ city }}" placeholder="Votre ville ou quartier" /></label>
+      <label><span>Catégorie</span><select name="category"><option value="">Toutes les catégories</option>{% for c in categories %}<option value="{{ c['category'] }}" {% if category == c['category'] %}selected{% endif %}>{{ c['category'] }}</option>{% endfor %}</select></label>
+      <button class="btn primary" type="submit">Rechercher <span>→</span></button>
+      {% if q or city or category %}<a class="search-reset" href="{{ url_for('index') }}">Effacer les filtres</a>{% endif %}
+    </form>
+    <div class="hero-trust"><span>✓ Sans compte client</span><span>✓ Contact direct</span><span>✓ Gratuit au lancement</span></div>
+  </div>
+  <div class="hero-visual">
+    <div class="hero-orb orb-one"></div><div class="hero-orb orb-two"></div>
+    <div class="hero-photo"><div class="photo-placeholder"><span>⌂</span><b>Les talents de votre quartier</b><small>Des professionnels à portée de main</small></div></div>
+    <div class="float-card float-top"><span class="float-icon">✦</span><div><b>Près de chez vous</b><small>Des services locaux</small></div></div>
+    <div class="float-card float-bottom"><span class="online-dot"></span><div><b>Contact facile</b><small>WhatsApp ou messagerie</small></div></div>
+  </div>
+</section>
 
-      <div class="flex items-center gap-3">
-        <span class="text-[11px] font-black uppercase tracking-wider text-red-600 flex items-center gap-1.5 bg-red-50 border border-red-200 px-3 py-1 rounded-full">
-          <span class="w-2 h-2 rounded-full bg-red-600 animate-ping"></span> DIRECT 24/7
-        </span>
-        <!-- Accès Régie retiré de l'interface publique. -->
-      </div>
-    </div>
-  </header>
-
-  <!-- Contenu Principal -->
-  <main class="max-w-7xl mx-auto p-4 sm:p-6 space-y-4 flex-1 w-full">
-    
-    <!-- Barre de Changement Rapide de Chaînes TV en 1 Clic -->
-    <div class="bg-white border border-slate-200 rounded-2xl p-3 shadow-xs flex items-center gap-2 overflow-x-auto">
-      <span class="text-xs font-black text-slate-800 uppercase tracking-wider shrink-0 flex items-center gap-1.5 pr-2 border-r border-slate-200">
-        <span class="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span> Chaînes TV :
-      </span>
-      {% for ch in channels %}
-      <a 
-        href="/?channel={{ ch.id }}" 
-        class="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 border {{ 'bg-red-600 text-white border-red-600 shadow-xs' if current_channel and current_channel.id == ch.id else 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200' }}"
-      >
-        <span class="px-1.5 py-0.5 rounded-md font-mono text-[10px] font-black {{ 'bg-black/30 text-white' if current_channel and current_channel.id == ch.id else 'bg-slate-200 text-slate-800' }}">CH {{ ch.number }}</span>
-        <span>{{ ch.name }}</span>
+{% if services %}
+<section class="featured-carousel-section">
+  <div class="carousel-heading"><div><span class="eyebrow">À LA UNE</span><h2>Découvrez les services près de vous</h2></div><div class="carousel-controls"><button type="button" class="carousel-btn" data-carousel-prev aria-label="Précédent">←</button><button type="button" class="carousel-btn" data-carousel-next aria-label="Suivant">→</button></div></div>
+  <div class="featured-carousel" data-carousel>
+    {% for s in services[:8] %}
+    <article class="featured-slide {% if loop.first %}is-active{% endif %}">
+      <a href="{{ url_for('service_detail', service_id=s['id']) }}" class="featured-slide-link">
+        {% if s['image'] %}<img src="{{ url_for('static', filename='uploads/' + s['image']) }}" alt="{{ s['title'] }}" loading="lazy">{% else %}<div class="featured-placeholder"><span>✦</span><b>{{ s['category'] }}</b></div>{% endif %}
+        <div class="featured-slide-shade"></div>
+        <div class="featured-slide-copy"><span>{{ s['category'] }} · {{ s['city'] }}</span><h3>{{ s['title'] }}</h3><p>{{ s['provider_name'] }}</p></div>
       </a>
-      {% endfor %}
-    </div>
+    </article>
+    {% endfor %}
+  </div>
+  <div class="carousel-dots" data-carousel-dots></div>
+</section>
+{% endif %}
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      
-      <!-- Colonne Gauche : Lecteur & Commandes -->
-      <div class="lg:col-span-2 space-y-4" id="main-player-col">
-      
-      <!-- Container du Lecteur -->
-      <div class="w-full flex justify-center">
-        <div id="player-container" class="w-full aspect-video bg-black rounded-3xl overflow-hidden border border-slate-300 shadow-2xl relative group select-none flex items-center justify-center transition-all duration-300">
-          
-          <div class="ecran">
+{% if ads.get(1) %}
+<section class="ad-wrap"><span class="ad-label">PUBLICITÉ</span><a class="ad-banner ad-wide" href="{{ ads[1]['target_url'] or '#' }}" {% if ads[1]['target_url'] %}target="_blank" rel="noopener noreferrer"{% endif %}>
+  {% if ads[1]['image'] %}<img src="{{ url_for('static', filename='uploads/' + ads[1]['image']) }}" alt="Publicité {{ ads[1]['advertiser'] }}">{% else %}<span class="ad-empty"><b>Votre entreprise ici</b><small>Emplacement publicitaire ProxiService</small></span>{% endif %}
+</a></section>
+{% endif %}
 
-            <video
-                id="lecteur"
-                controls
-                autoplay
-                playsinline
-                preload="metadata"
-            >
-                Votre navigateur ne peut pas lire cette vidéo.
-            </video>
+<section class="section">
+  <div class="section-heading"><div><span class="eyebrow">EXPLORER</span><h2>Que recherchez-vous ?</h2><p>Choisissez une catégorie pour trouver le bon professionnel.</p></div></div>
+  <div class="category-grid">
+    {% set default_categories = [('🔧','Plomberie'),('⚡','Électricité'),('💇','Coiffure'),('🧵','Couture'),('🚗','Mécanique'),('🧹','Ménage'),('📱','Réparation téléphone'),('💻','Informatique')] %}
+    {% for emoji, label in default_categories %}
+      <a class="category-card" href="{{ url_for('index', category=label) }}"><span class="category-icon">{{ emoji }}</span><b>{{ label }}</b><span class="category-arrow">↗</span></a>
+    {% endfor %}
+  </div>
+</section>
 
-            <div id="sousTitre"></div>
+{% if ads.get(2) %}
+<section class="ad-wrap ad-wrap-mobile"><span class="ad-label">PUBLICITÉ</span><a class="ad-banner ad-compact" href="{{ ads[2]['target_url'] or '#' }}" {% if ads[2]['target_url'] %}target="_blank" rel="noopener noreferrer"{% endif %}>
+  {% if ads[2]['image'] %}<img src="{{ url_for('static', filename='uploads/' + ads[2]['image']) }}" alt="Publicité {{ ads[2]['advertiser'] }}">{% else %}<span class="ad-empty"><b>Votre publicité ici</b></span>{% endif %}
+</a></section>
+{% endif %}
 
-            <div id="info">
-                Aucune chaîne sélectionnée
-            </div>
+<section class="section services-section">
+  <div class="section-heading"><div><span class="eyebrow">À DÉCOUVRIR</span><h2>{% if q or city or category %}Résultats de recherche{% else %}Des professionnels à découvrir{% endif %}</h2><p>Consultez les services et contactez directement leurs prestataires.</p></div><span class="result-count">{{ services|length }} résultat{% if services|length != 1 %}s{% endif %}</span></div>
+  {% if services %}
+  <div class="service-grid">
+    {% for s in services %}
+    <article class="service-card">
+      <a class="service-image" href="{{ url_for('service_detail', service_id=s['id']) }}">
+        {% if s['image'] %}<img src="{{ url_for('static', filename='uploads/' + s['image']) }}" alt="{{ s['title'] }}" loading="lazy">{% else %}<span class="service-placeholder">✦<small>{{ s['category'] }}</small></span>{% endif %}
+        <span class="service-category">{{ s['category'] }}</span>
+      </a>
+      <div class="service-info"><div class="service-location">⌖ {{ s['neighborhood'] + ', ' if s['neighborhood'] else '' }}{{ s['city'] }}</div><h3><a href="{{ url_for('service_detail', service_id=s['id']) }}">{{ s['title'] }}</a></h3><p class="provider-name">{{ s['provider_name'] }}</p><div class="service-bottom"><b>{{ s['price'] or 'Prix à demander' }}</b><a class="round-link" href="{{ url_for('service_detail', service_id=s['id']) }}">↗</a></div></div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state"><div class="empty-icon">⌕</div><h3>Aucun service pour le moment</h3><p>Modifiez les mots-clés ou la catégorie. Les professionnels peuvent publier leurs services.</p><a class="btn primary" href="{{ url_for('register') }}">Proposer un service</a></div>
+  {% endif %}
+</section>
 
-          </div>
-        </div>
-      </div>
-
-      <!-- Informations & Actions -->
-      <div class="bg-white border border-slate-200 p-5 rounded-3xl shadow-xs space-y-3">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span id="current-category" class="bg-red-50 text-red-600 font-black text-[10px] px-2.5 py-0.5 rounded border border-red-200">{{ current_channel.schedule[0].category if current_channel and current_channel.schedule else 'DIRECT 24/7' }}</span>
-            <span class="text-xs font-mono font-bold text-slate-700">
-              <span id="current-time-range">{{ current_channel.schedule[0].startTime if current_channel and current_channel.schedule else '00:00' }} → {{ current_channel.schedule[0].endTime if current_channel and current_channel.schedule else '23:59' }}</span>
-            </span>
-          </div>
-          <span id="current-days" class="text-xs text-slate-500 font-medium">Tous les jours</span>
-        </div>
-
-        <h2 class="text-lg font-black text-slate-900">
-          <span id="current-title">{{ current_channel.schedule[0].title if current_channel and current_channel.schedule else 'Antenne Prête pour la Diffusion' }}</span>
-        </h2>
-
-        <div class="flex items-center justify-between pt-2 border-t border-slate-100">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-full bg-red-600 text-white font-black flex items-center justify-center text-xs">
-              {{ current_channel.logoText if current_channel else 'V+' }}
-            </div>
-            <div>
-              <h3 class="text-xs font-bold text-slate-900">{{ current_channel.name if current_channel else 'DTN TV' }}</h3>
-              <p class="text-[10px] text-slate-500">{{ current_channel.genre if current_channel else 'Généraliste' }}</p>
-            </div>
-          </div>
-
-          <div class="flex items-center gap-2">
-            <button onclick="downloadCurrentVideo()" class="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold px-3.5 py-1.5 rounded-full transition border border-slate-300">
-              ⬇️ Télécharger
-            </button>
-            <button onclick="toggleFullscreen()" class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-full transition shadow-xs">
-              Grand Écran
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Colonne Droite : Bouquet des Chaînes TV -->
-    <div class="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-4 h-fit">
-      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-        <h3 class="font-extrabold text-sm text-slate-900">Bouquet des Chaînes TV</h3>
-        <span class="text-xs font-bold text-slate-500">{{ channels|length }} chaînes</span>
-      </div>
-
-      <div class="space-y-2.5">
-        {% for ch in channels %}
-        <a 
-          href="/?channel={{ ch.id }}" 
-          class="block p-3.5 rounded-2xl border transition {{ 'bg-red-50/70 border-red-300 shadow-2xs' if current_channel and current_channel.id == ch.id else 'border-slate-200 bg-white hover:bg-slate-50' }}"
-        >
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <span class="px-2 py-0.5 rounded-lg font-mono text-xs font-black {{ 'bg-red-600 text-white' if current_channel and current_channel.id == ch.id else 'bg-slate-100 text-slate-700' }}">
-                CH {{ ch.number }}
-              </span>
-              <div>
-                <span class="font-extrabold block text-slate-900 text-xs">{{ ch.name }}</span>
-                <span class="text-[11px] text-slate-500">{{ ch.genre }}</span>
-              </div>
-            </div>
-            {% if current_channel and current_channel.id == ch.id %}
-            <span class="text-[10px] text-emerald-600 font-bold font-mono">● EN DIRECT</span>
-            {% endif %}
-          </div>
-        </a>
-        {% endfor %}
-      </div>
-    </div>
-
-  </main>
-
-  <script>
-    const video = document.getElementById('lecteur');
-    const iframe = null;
-    const sousTitre = document.getElementById('sousTitre');
-    const info = document.getElementById('info');
-    const container = document.getElementById('player-container');
-    const progressBar = null;
-    const scrubberDot = null;
-    const timeCur = null;
-    const timeTot = null;
-    const iconPlay = null;
-    const iconPause = null;
-    const centerPlayBtn = null;
-    const speedLabel = null;
-    const ccOverlay = null;
-    const btnCc = null;
-
-    const channelsData = {{ channels | tojson | safe }};
-    const channelId = {{ (current_channel.id if current_channel else '') | tojson }};
-    let currentChannel = channelsData.find(c => c.id === channelId) || channelsData[0] || null;
-    let currentProgram = null;
-    let currentProgramIndex = -1;
-    let hls = null;
-    let ytPlayer = null;
-    let ccActive = false;
-    let lastProgramId = null;
-
-    function fmt(s) {
-      if (!Number.isFinite(s)) return '00:00';
-      const m = Math.floor(s / 60).toString().padStart(2, '0');
-      const sec = Math.floor(s % 60).toString().padStart(2, '0');
-      return m + ':' + sec;
-    }
-
-    async function refreshSchedule() {
-      if (!currentChannel?.id) return;
-      try {
-        const res = await fetch(`/api/channels/${encodeURIComponent(currentChannel.id)}/current`, { cache: 'no-store' });
-        if (!res.ok) return;
-        const data = await res.json();
-        currentChannel = data.channel || currentChannel;
-        const p = data.current;
-        if (p && p.id !== lastProgramId) {
-          const index = (currentChannel.schedule || []).findIndex(x => x.id === p.id);
-          loadProgram(p, index >= 0 ? index : 0);
-        } else if (!p && data.next && lastProgramId) {
-          // Pas de programme actif : attendre le prochain créneau.
-          lastProgramId = null;
-        }
-      } catch (e) {
-        // Le lecteur continue avec le programme déjà chargé si le serveur est temporairement indisponible.
-      }
-    }
-
-    function setText(id, value) {
-      const el = document.getElementById(id);
-      if (el) el.textContent = value;
-    }
-
-    function showProgramInfo(p) {
-      setText('current-category', p?.category || 'DIRECT 24/7');
-      setText('current-title', p?.title || 'Antenne Prête pour la Diffusion');
-      setText('current-time-range', `${p?.startTime || '00:00'} → ${p?.endTime || '23:59'}`);
-      const days = Array.isArray(p?.day) ? p.day : ['Tous les jours'];
-      setText('current-days', days.join(', '));
-      setText('cc-text', `[Direct TV] • ${p?.title || 'DTN TV Diffusion'}`);
-    }
-
-    function destroyPlayers() {
-      if (hls) { try { hls.destroy(); } catch(e) {} hls = null; }
-      if (ytPlayer) { try { ytPlayer.destroy(); } catch(e) {} ytPlayer = null; }
-      video.pause();
-      video.removeAttribute('src');
-      video.load();
-    }
-
-    function loadProgram(p, index) {
-      if (!p || !p.videoUrl) return;
-      if (lastProgramId === p.id) return;
-      lastProgramId = p.id;
-      currentProgram = p;
-      fetch('/api/view',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({channel_id:currentChannel?.id||'',program_id:p.id||'',youtube_id:p.youtubeId||''})}).catch(()=>{});
-      currentProgramIndex = index;
-      showProgramInfo(p);
-      destroyPlayers();
-
-      const type = p.playbackType || detectType(p.videoUrl);
-      const url = p.playbackUrl || p.videoUrl;
-
-      // Le lecteur demandé est un élément HTML5 <video>.
-      // Il lit les fichiers vidéo et les flux compatibles navigateur.
-      // Une URL YouTube n'est pas un flux vidéo HTML5 direct.
-      if (type === 'youtube') {
-        video.src = '';
-        video.load();
-        info.textContent = 'YouTube : utilisez un lien d’intégration autorisé.';
-        sousTitre.textContent = p.title || '';
-        return;
-      }
-
-      if (type === 'hls' && window.Hls && Hls.isSupported()) {
-        hls = new Hls();
-        hls.loadSource(url);
-        hls.attachMedia(video);
-      } else {
-        video.src = url;
-      }
-
-      video.play().catch(()=>{});
-    }
-
-    function extractYouTubeId(value) {
-      try {
-        const raw = String(value || '').trim();
-        if (!raw) return null;
-        const u = new URL(raw);
-        const host = u.hostname.replace(/^www\./i, '').toLowerCase();
-
-        // https://youtu.be/MklIPeDzU7g?feature=shared
-        if (host === 'youtu.be') {
-          const id = u.pathname.split('/').filter(Boolean)[0];
-          return id || null;
-        }
-
-        if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'youtube-nocookie.com') {
-          // https://www.youtube.com/watch?v=VIDEO_ID
-          const v = u.searchParams.get('v');
-          if (v) return v;
-
-          // /shorts/VIDEO_ID, /embed/VIDEO_ID, /live/VIDEO_ID
-          const parts = u.pathname.split('/').filter(Boolean);
-          const marker = parts[0]?.toLowerCase();
-          if (['shorts', 'embed', 'live', 'v'].includes(marker)) return parts[1] || null;
-        }
-      } catch (e) {}
-      return null;
-    }
-
-    function detectType(url) {
-      if (extractYouTubeId(url)) return 'youtube';
-      if (/\.m3u8(\?|$)/i.test(url)) return 'hls';
-      return 'video';
-    }
-
-    function advanceProgram() {
-      if (!currentChannel?.schedule?.length) return;
-      const list = currentChannel.schedule;
-      const now = new Date();
-      const dayNames = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
-      const today = dayNames[now.getDay()];
-      const minsNow = now.getHours() * 60 + now.getMinutes();
-      const dayMatch = p => {
-        const days = Array.isArray(p?.days) ? p.days : (Array.isArray(p?.day) ? p.day : ['Tous les jours']);
-        return days.includes('Tous les jours') || days.includes(today);
-      };
-      const toMin = t => { const m=String(t||'00:00').match(/^(\d{1,2}):(\d{2})/); return m ? (+m[1]*60 + +m[2]) : 0; };
-      const candidates = list.map((p,i)=>({p,i,start:toMin(p.startTime)}))
-        .filter(x => x.p && x.p.autoNext !== false && dayMatch(x.p));
-      candidates.sort((a,b)=>a.start-b.start);
-      const currentStart = currentProgram ? toMin(currentProgram.startTime) : minsNow;
-      let next = candidates.find(x => x.start > currentStart);
-      if (!next) next = candidates.find(x => x.start >= minsNow) || candidates[0];
-      if (next) loadProgram(next.p, next.i);
-    }
-
-    window.onYouTubeIframeAPIReady = function() {
-      initYoutubePlayer();
-    };
-    function initYoutubePlayer() {
-      if (iframe.classList.contains('hidden') || !iframe.src || !window.YT?.Player || ytPlayer) return;
-      ytPlayer = new YT.Player('tv-iframe', {
-        events: {
-          onStateChange: e => {
-            if (e.data === YT.PlayerState.ENDED) advanceProgram();
-          }
-        }
-      });
-    }
-
-    video.addEventListener('loadedmetadata', () => {
-      info.textContent = currentProgram?.title || currentChannel?.name || 'DTN TV';
-    });
-    video.addEventListener('error', () => {
-      info.textContent = 'Impossible de lire ce flux avec le lecteur actuel.';
-    });
-    video.addEventListener('ended', advanceProgram);
-
-    function togglePlay() {
-      if (video.paused) video.play().catch(()=>{}); else video.pause();
-    }
-    function toggleMute() { video.muted = !video.muted; }
-    function seekVideo(e) {
-      if (!video.duration) return;
-      const rect=e.currentTarget.getBoundingClientRect();
-      video.currentTime=((e.clientX-rect.left)/rect.width)*video.duration;
-    }
-    function changeSpeed() {
-      const speeds=[1,1.25,1.5,2,0.5];
-      const current=speeds.indexOf(video.playbackRate);
-      video.playbackRate=speeds[(current+1)%speeds.length];
-    }
-    function toggleSubtitles() {
-      if (sousTitre) sousTitre.classList.toggle('hidden');
-    }
-    function downloadCurrentVideo() {
-      const url=currentProgram?.videoUrl || video.currentSrc;
-      if (!url) return;
-      window.open(url, '_blank', 'noopener');
-    }
-    function toggleFullscreen() {
-      const target=document.querySelector('.ecran') || video;
-      if (!document.fullscreenElement) target.requestFullscreen?.().catch(()=>{});
-      else document.exitFullscreen?.();
-    }
-    function toggleTheater() {}
-
-    window.addEventListener('keydown',e=>{
-      if(['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
-      if(e.key===' '||e.key==='k'){e.preventDefault();togglePlay();}
-      if(e.key==='f'){e.preventDefault();toggleFullscreen();}
-      if(e.key==='m'){e.preventDefault();toggleMute();}
-      if(e.key==='t'){e.preventDefault();toggleTheater();}
-      if(e.key==='c'){e.preventDefault();toggleSubtitles();}
-    });
-
-    // Le serveur est la source de vérité pour le programme à l'antenne.
-    // Le contrôle est vérifié régulièrement pour changer automatiquement de programme
-    // quand l'heure de fin est atteinte ou quand un nouveau créneau commence.
-    refreshSchedule();
-    setInterval(refreshSchedule, 2000);
-  </script>
-</body>
-</html>
+<section class="join-cta"><div><span class="eyebrow light">VOUS ÊTES PROFESSIONNEL ?</span><h2>Faites découvrir votre savoir-faire.</h2><p>Créez votre espace professionnel et présentez vos services aux personnes de votre région.</p></div><a class="btn white" href="{{ url_for('register') }}">Publier mes services <span>→</span></a></section>
+{% endblock %}
