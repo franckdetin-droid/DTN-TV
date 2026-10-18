@@ -19,7 +19,8 @@
       <a href="{{ url_for('inbox') }}">Messages</a>
       <a class="nav-cta" href="{{ url_for('logout') }}">Déconnexion</a>
     {% else %}
-      <a href="{{ url_for('login') }}">Espace professionnel</a>
+      <a href="{{ url_for('login') }}">Connexion</a>
+      <a href="{{ url_for('client_register') }}">Compte client</a>
       <a class="nav-cta" href="{{ url_for('register') }}">Proposer un service</a>
     {% endif %}
   </nav>

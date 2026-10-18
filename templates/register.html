@@ -1,6 +1,6 @@
 {% extends "base.html" %}{% block title %}Créer un espace professionnel — ProxiService{% endblock %}
 {% block content %}<div class="form-page"><div class="form-card"><span class="eyebrow">REJOINDRE LE RÉSEAU</span><h1>Présentez vos services.</h1><p>Les clients peuvent parcourir les annonces sans créer de compte. Cet espace est réservé aux professionnels.</p>
-<form method="post" class="form-grid">
+<form method="post" class="form-grid"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <label>Nom professionnel *<input name="name" required maxlength="100" placeholder="Nom ou nom de votre entreprise"></label>
 <label>E-mail *<input type="email" name="email" required placeholder="vous@exemple.com"></label>
 <label>Mot de passe *<input type="password" name="password" minlength="8" required autocomplete="new-password" placeholder="8 caractères minimum"></label>

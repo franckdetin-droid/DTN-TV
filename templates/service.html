@@ -14,7 +14,7 @@
       <div class="detail-price">{{ service['price'] or 'Tarif à demander' }}</div>
     </section>
     <aside class="provider-panel">
-      <div class="provider-avatar">{{ service['provider_name'][:1]|upper }}</div><span class="eyebrow">VOTRE PROFESSIONNEL</span><h2>{{ service['provider_name'] }}</h2>
+      <div class="provider-avatar">{{ service['provider_name'][:1]|upper }}</div><span class="eyebrow">VOTRE PROFESSIONNEL</span><h2><a href="{{ url_for('provider_profile', provider_id=service['provider_id']) }}">{{ service['provider_name'] }}</a></h2><p><a href="{{ url_for('provider_profile', provider_id=service['provider_id']) }}">Voir le profil et tous ses services →</a></p>
       {% if service['provider_bio'] %}<p>{{ service['provider_bio'] }}</p>{% endif %}
       <div class="contact-actions">
         {% if service['whatsapp'] %}

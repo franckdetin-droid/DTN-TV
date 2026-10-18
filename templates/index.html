@@ -73,7 +73,7 @@
         {% if s['image'] %}<img src="{{ url_for('static', filename='uploads/' + s['image']) }}" alt="{{ s['title'] }}" loading="lazy">{% else %}<span class="service-placeholder">✦<small>{{ s['category'] }}</small></span>{% endif %}
         <span class="service-category">{{ s['category'] }}</span>
       </a>
-      <div class="service-info"><div class="service-location">⌖ {{ s['neighborhood'] + ', ' if s['neighborhood'] else '' }}{{ s['city'] }}</div><h3><a href="{{ url_for('service_detail', service_id=s['id']) }}">{{ s['title'] }}</a></h3><p class="provider-name">{{ s['provider_name'] }}</p><div class="service-bottom"><b>{{ s['price'] or 'Prix à demander' }}</b><a class="round-link" href="{{ url_for('service_detail', service_id=s['id']) }}">↗</a></div></div>
+      <div class="service-info"><div class="service-location">⌖ {{ s['neighborhood'] + ', ' if s['neighborhood'] else '' }}{{ s['city'] }}</div><h3><a href="{{ url_for('service_detail', service_id=s['id']) }}">{{ s['title'] }}</a></h3><p class="provider-name"><a href="{{ url_for('provider_profile', provider_id=s['user_id']) }}">{{ s['provider_name'] }}</a></p><div class="service-bottom"><b>{{ s['price'] or 'Prix à demander' }}</b><a class="round-link" href="{{ url_for('service_detail', service_id=s['id']) }}">↗</a></div></div>
     </article>
     {% endfor %}
   </div>
